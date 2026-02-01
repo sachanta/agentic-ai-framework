@@ -1,0 +1,2 @@
+Add support in frontend for file upload to weaviate:
+For now only support for pdf files.

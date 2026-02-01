@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentic-ai-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=false
+      - MONGODB_URI=mongodb://mongodb:27017
+      - MONGODB_DATABASE=agentic_ai
+      - WEAVIATE_URL=http://weaviate:8080
+    env_file:
+      - .env
+    depends_on:
+      - mongodb
+      - weaviate
+    networks:
+      - agentic-network
+    volumes:
+      - ./app:/app/app:ro  # For development - mount code
+
+  mongodb:
+    image: mongo:7.0
+    container_name: agentic-ai-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - agentic-network
+
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.35.1
+    container_name: agentic-ai-weaviate
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      ENABLE_MODULES: 'text2vec-cohere,text2vec-huggingface,text2vec-openai,text2vec-palm,generative-openai,generative-cohere,generative-palm,ref2vec-centroid,reranker-cohere,qna-openai'
+      CLUSTER_HOSTNAME: 'node1'
+      ASYNC_INDEXING: 'true'
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    networks:
+      - agentic-network
+
+networks:
+  agentic-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  weaviate_data:
