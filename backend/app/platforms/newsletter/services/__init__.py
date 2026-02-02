@@ -132,9 +132,29 @@ from app.platforms.newsletter.services.tavily import (
     get_tavily_service,
 )
 
+from app.platforms.newsletter.services.rag import (
+    NewsletterRAGService,
+    get_rag_service,
+    COLLECTION_NAME as RAG_COLLECTION_NAME,
+)
+
+from app.platforms.newsletter.services.memory import (
+    MemoryService,
+    get_memory_service,
+    CacheType,
+    CACHE_COLLECTION,
+)
+
 __all__ = [
     "NewsletterService",
     "TavilySearchService",
     "SearchResult",
     "get_tavily_service",
+    "NewsletterRAGService",
+    "get_rag_service",
+    "RAG_COLLECTION_NAME",
+    "MemoryService",
+    "get_memory_service",
+    "CacheType",
+    "CACHE_COLLECTION",
 ]
