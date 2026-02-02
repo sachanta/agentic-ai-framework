@@ -13,6 +13,7 @@ from app.core.middleware import setup_middleware
 from app.db.mongodb import connect_mongodb, close_mongodb, init_default_data
 from app.db.weaviate import connect_weaviate, close_weaviate
 from app.platforms.hello_world import register_platform as register_hello_world
+from app.platforms.newsletter import register_platform as register_newsletter
 
 # Configure logging
 logging.basicConfig(
@@ -35,6 +36,7 @@ async def lifespan(app: FastAPI):
     # Register platforms
     logger.info("Registering platforms...")
     register_hello_world()
+    register_newsletter()
     logger.info("Platforms registered")
 
     # Connect to MongoDB (required)

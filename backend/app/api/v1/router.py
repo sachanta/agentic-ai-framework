@@ -19,6 +19,7 @@ from app.api.v1.endpoints import (
 
 # Platform routers
 from app.platforms.hello_world.router import router as hello_world_router
+from app.platforms.newsletter.router import router as newsletter_router
 
 api_router = APIRouter()
 
@@ -40,4 +41,9 @@ api_router.include_router(
     hello_world_router,
     prefix="/platforms/hello-world",
     tags=["platform:hello-world"],
+)
+api_router.include_router(
+    newsletter_router,
+    prefix="/platforms/newsletter",
+    tags=["platform:newsletter"],
 )
