@@ -126,4 +126,15 @@ class NewsletterService:
         }
 
 
-__all__ = ["NewsletterService"]
+from app.platforms.newsletter.services.tavily import (
+    TavilySearchService,
+    SearchResult,
+    get_tavily_service,
+)
+
+__all__ = [
+    "NewsletterService",
+    "TavilySearchService",
+    "SearchResult",
+    "get_tavily_service",
+]

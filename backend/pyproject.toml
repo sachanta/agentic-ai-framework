@@ -42,6 +42,7 @@ dependencies = [
     "bcrypt (>=4.0.0,<4.1.0)",
     "pypdf>=4.0.0",
     "sse-starlette>=1.8.0",
+    "tavily-python>=0.3.0",
 ]
 
 [project.optional-dependencies]
