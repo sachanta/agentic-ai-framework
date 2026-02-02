@@ -1,12 +1,15 @@
 """
 Newsletter Platform agents.
 
-Agents will be implemented in Phases 6-9:
-- ResearchAgent: Content discovery via Tavily
-- WritingAgent: Newsletter content generation
-- PreferenceAgent: User personalization
-- CustomPromptAgent: NLP processing
-- MindmapAgent: Visual knowledge maps
+Agents:
+- ResearchAgent: Content discovery via Tavily (Phase 6)
+- WritingAgent: Newsletter content generation (Phase 7)
+- PreferenceAgent: User personalization (Phase 8)
+- CustomPromptAgent: NLP processing (Phase 8)
+- MindmapAgent: Visual knowledge maps (Phase 9)
 """
+from app.platforms.newsletter.agents.research import ResearchAgent
 
-__all__ = []
+__all__ = [
+    "ResearchAgent",
+]
