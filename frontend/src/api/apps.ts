@@ -10,6 +10,13 @@ import type {
   HelloWorldRequest,
   HelloWorldResponse,
 } from '@/types/app';
+import type {
+  ResearchRequest,
+  CustomResearchRequest,
+  ResearchResponse,
+  NewsletterStatus,
+  NewsletterAgent,
+} from '@/types/newsletter';
 
 const BASE_PATH = '/api/v1/platforms';
 
@@ -98,5 +105,70 @@ export const helloWorldApi = {
     );
     // Extract the greeting response from the result
     return response.data.result;
+  },
+};
+
+// Longer timeout for LLM-powered research operations (3 minutes)
+const RESEARCH_TIMEOUT = 180000;
+
+/**
+ * Newsletter Platform API
+ */
+export const newsletterApi = {
+  /**
+   * Get Newsletter platform status
+   */
+  getStatus: async (): Promise<NewsletterStatus> => {
+    const response = await apiClient.get<NewsletterStatus>(`${BASE_PATH}/newsletter/status`);
+    return response.data;
+  },
+
+  /**
+   * List Newsletter agents
+   */
+  getAgents: async (): Promise<NewsletterAgent[]> => {
+    const response = await apiClient.get<NewsletterAgent[]>(`${BASE_PATH}/newsletter/agents`);
+    return response.data;
+  },
+
+  /**
+   * Research content by topics
+   */
+  research: async (request: ResearchRequest): Promise<ResearchResponse> => {
+    const response = await apiClient.post<ResearchResponse>(
+      `${BASE_PATH}/newsletter/research`,
+      request,
+      { timeout: RESEARCH_TIMEOUT }
+    );
+    return response.data;
+  },
+
+  /**
+   * Research content using custom prompt
+   */
+  researchCustom: async (request: CustomResearchRequest): Promise<ResearchResponse> => {
+    const response = await apiClient.post<ResearchResponse>(
+      `${BASE_PATH}/newsletter/research/custom`,
+      request,
+      { timeout: RESEARCH_TIMEOUT }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get trending content
+   */
+  getTrending: async (topics: string[], maxResults: number = 10): Promise<ResearchResponse> => {
+    const response = await apiClient.get<ResearchResponse>(
+      `${BASE_PATH}/newsletter/research/trending`,
+      {
+        params: {
+          topics: topics.join(','),
+          max_results: maxResults,
+        },
+        timeout: RESEARCH_TIMEOUT,
+      }
+    );
+    return response.data;
   },
 };

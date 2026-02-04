@@ -5,7 +5,7 @@ This platform can use the global LLM settings or override them.
 Set environment variables with NEWSLETTER_ prefix to override.
 """
 from typing import Optional, List
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.config import settings
 
@@ -57,7 +57,12 @@ class NewsletterConfig(BaseSettings):
     # Cache settings (using MongoDB with TTL indexes)
     CACHE_TTL_SECONDS: int = 3600  # Default TTL for cached items
 
-    model_config = {"env_prefix": "NEWSLETTER_"}
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="NEWSLETTER_",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
     @property
     def effective_provider(self) -> str:

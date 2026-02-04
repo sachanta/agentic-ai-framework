@@ -156,3 +156,107 @@ NEWSLETTER_LLM_MODEL=llama3       # Override global model
 3. **class Config** in Pydantic → Use `model_config = {...}`
 4. **Strict float assertions** → Use `>=` or `pytest.approx()`
 5. **Python command** → Use `.venv/bin/python` from backend directory
+6. **LLM Provider kwargs** → Check provider `__init__` signature before passing args
+7. **BaseAgent reserved attributes** → Don't overwrite `self.memory`, `self.llm`, `self.name`
+
+### BaseAgent Reserved Attributes
+
+When extending `BaseAgent`, these attributes are used internally and should NOT be overwritten:
+
+```python
+class BaseAgent:
+    self.name        # Agent name
+    self.llm         # LLM provider instance
+    self.memory      # AgentMemory for conversation history (NOT for caching!)
+    self.system_prompt
+    self.tools
+```
+
+**Common mistake:** Using `self.memory` for a caching service:
+
+```python
+# WRONG - overwrites BaseAgent's conversation memory
+class MyAgent(BaseAgent):
+    def __init__(self):
+        super().__init__(...)
+        self.memory = get_cache_service()  # Breaks BaseAgent!
+
+# CORRECT - use a different attribute name
+class MyAgent(BaseAgent):
+    def __init__(self):
+        super().__init__(...)
+        self.cache_service = get_cache_service()  # Safe
+```
+
+### LLM Provider Initialization
+
+Each provider has different `__init__` parameters:
+
+```python
+# OllamaProvider accepts:
+OllamaProvider(base_url=..., default_model=..., timeout=...)
+
+# OpenAIProvider accepts:
+OpenAIProvider(api_key=..., default_model=..., timeout=...)
+
+# AWSBedrockProvider accepts:
+AWSBedrockProvider(region=..., default_model=..., timeout=...)
+```
+
+**IMPORTANT:** Use `default_model`, NOT `model`:
+
+```python
+# Correct
+get_llm_provider(provider_type=LLMProviderType.OLLAMA, default_model="llama3")
+
+# Wrong - causes "unexpected keyword argument 'model'"
+get_llm_provider(provider_type=LLMProviderType.OLLAMA, model="llama3")
+```
+
+## Test Coverage Guidelines
+
+### Mock at the Right Level
+
+When testing API endpoints that use agents, consider what level to mock:
+
+1. **Mocking the entire agent class** (fast, but misses initialization bugs):
+   ```python
+   # This skips agent.__init__(), so LLM init bugs won't be caught
+   with patch("...routers.research.ResearchAgent") as MockAgent:
+       mock_agent = MagicMock()
+       mock_agent.run = AsyncMock(return_value=result)
+       MockAgent.return_value = mock_agent
+   ```
+
+2. **Mocking agent dependencies** (slower, but catches init bugs):
+   ```python
+   # This runs agent.__init__(), catching LLM/service init issues
+   with patch("...agents.research.agent.get_tavily_service") as mock_tavily, \
+        patch("...agents.research.agent.get_memory_service") as mock_memory, \
+        patch("...agents.research.llm.get_llm_provider") as mock_llm:
+       # Agent init runs, dependencies are mocked
+   ```
+
+### Test Initialization Separately
+
+Always add unit tests for factory functions like `get_*_llm()`:
+
+```python
+def test_get_research_llm_initializes():
+    """Ensure LLM provider can be initialized without errors."""
+    with patch("...get_llm_provider") as mock_provider:
+        mock_provider.return_value = MagicMock()
+        llm = get_research_llm()
+        # Verify correct kwargs were passed
+        mock_provider.assert_called_once()
+        call_kwargs = mock_provider.call_args.kwargs
+        assert "default_model" in call_kwargs or "provider_type" in call_kwargs
+```
+
+### Integration Test Checklist
+
+Before marking a phase complete, ensure:
+- [ ] Unit tests pass with mocked dependencies
+- [ ] Factory functions (`get_*_llm`, `get_*_service`) are tested
+- [ ] At least one integration test exists (can be skipped if requires external API)
+- [ ] Manual smoke test with real services works

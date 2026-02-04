@@ -17,6 +17,7 @@ def get_research_llm():
     Get the LLM provider for the Research Agent.
 
     Uses newsletter platform config with fallback to global settings.
+    Uses a longer timeout (5 minutes) for batch operations like summarization.
 
     Returns:
         LLMProvider instance
@@ -24,15 +25,19 @@ def get_research_llm():
     provider_name = config.effective_provider.lower()
 
     provider_type = {
+        "gemini": LLMProviderType.GEMINI,
+        "perplexity": LLMProviderType.PERPLEXITY,
         "ollama": LLMProviderType.OLLAMA,
         "openai": LLMProviderType.OPENAI,
         "aws_bedrock": LLMProviderType.AWS_BEDROCK,
         "bedrock": LLMProviderType.AWS_BEDROCK,  # Alias
-    }.get(provider_name, LLMProviderType.OLLAMA)
+    }.get(provider_name, LLMProviderType.GEMINI)
 
+    # Use longer timeout for batch summarization with local LLMs
     return get_llm_provider(
         provider_type=provider_type,
-        model=config.effective_model,
+        default_model=config.effective_model,
+        timeout=300.0,  # 5 minutes for batch operations
     )
 
 

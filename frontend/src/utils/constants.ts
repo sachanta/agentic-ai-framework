@@ -13,6 +13,7 @@ export const ROUTES = {
   APPS: '/apps',
   APP_DETAIL: '/apps/:appId',
   HELLO_WORLD_APP: '/apps/hello-world',
+  NEWSLETTER_APP: '/apps/newsletter',
   AGENTS: '/agents',
   AGENT_DETAIL: '/agents/:id',
   TOOLS: '/tools',

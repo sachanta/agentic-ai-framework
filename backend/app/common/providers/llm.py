@@ -1,9 +1,9 @@
 """
 LLM provider abstraction for multiple backends.
-Supports Ollama (default), OpenAI, and AWS Bedrock.
+Supports Gemini (default), Ollama, OpenAI, and AWS Bedrock.
 
 Configuration is driven by environment variables:
-    LLM_PROVIDER: ollama | openai | aws_bedrock
+    LLM_PROVIDER: gemini | ollama | openai | aws_bedrock
     LLM_DEFAULT_MODEL: Model name for the chosen provider
     LLM_TEMPERATURE: Default temperature (0.0-1.0)
     LLM_MAX_TOKENS: Default max tokens
@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 class LLMProviderType(str, Enum):
     """Supported LLM provider types."""
+    GEMINI = "gemini"
+    PERPLEXITY = "perplexity"
     OPENAI = "openai"
     OLLAMA = "ollama"
     AWS_BEDROCK = "aws_bedrock"
@@ -251,9 +253,13 @@ class OllamaProvider(LLMProvider):
                 finish_reason="stop" if data.get("done") else "length",
                 raw_response=data,
             )
+        except httpx.TimeoutException as e:
+            logger.error(f"Ollama generate timeout after {self.timeout}s: {type(e).__name__}")
+            raise RuntimeError(f"Ollama API timeout after {self.timeout}s")
         except httpx.HTTPError as e:
-            logger.error(f"Ollama generate error: {e}")
-            raise RuntimeError(f"Ollama API error: {e}")
+            error_msg = str(e) or f"{type(e).__name__}: HTTP error occurred"
+            logger.error(f"Ollama generate error: {error_msg}")
+            raise RuntimeError(f"Ollama API error: {error_msg}")
 
     async def chat(
         self,
@@ -834,6 +840,581 @@ class AWSBedrockProvider(LLMProvider):
             return False
 
 
+class GeminiProvider(LLMProvider):
+    """
+    Google Gemini LLM provider.
+
+    Supports Gemini Pro, Gemini Flash, and other Gemini models.
+    Uses the Gemini API v1beta.
+    """
+
+    provider_name = "gemini"
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        default_model: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ):
+        self.api_key = api_key or settings.GEMINI_API_KEY
+        self.base_url = (base_url or settings.GEMINI_BASE_URL).rstrip("/")
+        self.default_model = default_model or settings.LLM_DEFAULT_MODEL
+        self.timeout = timeout or settings.LLM_TIMEOUT
+        self._client: Optional[httpx.AsyncClient] = None
+
+        if not self.api_key:
+            logger.warning("Gemini API key not configured")
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Get or create the HTTP client."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                timeout=httpx.Timeout(self.timeout),
+                headers={"Content-Type": "application/json"},
+            )
+        return self._client
+
+    async def close(self):
+        """Close the HTTP client."""
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
+            self._client = None
+
+    def _build_contents(
+        self,
+        messages: List[Dict[str, str]],
+        system: Optional[str] = None,
+    ) -> tuple[List[Dict], Optional[Dict]]:
+        """
+        Convert messages to Gemini format.
+
+        Returns:
+            Tuple of (contents list, system_instruction dict or None)
+        """
+        contents = []
+        system_instruction = None
+
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+
+            if role == "system":
+                # Gemini uses system_instruction separately
+                system_instruction = {"parts": [{"text": content}]}
+            else:
+                # Map 'assistant' to 'model' for Gemini
+                gemini_role = "model" if role == "assistant" else "user"
+                contents.append({
+                    "role": gemini_role,
+                    "parts": [{"text": content}]
+                })
+
+        # If system prompt provided as parameter, use it
+        if system and not system_instruction:
+            system_instruction = {"parts": [{"text": system}]}
+
+        return contents, system_instruction
+
+    async def generate(
+        self,
+        prompt: str,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        stop: Optional[List[str]] = None,
+        system: Optional[str] = None,
+        **kwargs,
+    ) -> LLMResponse:
+        """Generate a response using Gemini's generateContent API."""
+        messages = [{"role": "user", "content": prompt}]
+        if system:
+            messages.insert(0, {"role": "system", "content": system})
+
+        return await self.chat(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stop=stop,
+            **kwargs,
+        )
+
+    async def chat(
+        self,
+        messages: List[Dict[str, str]],
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        stop: Optional[List[str]] = None,
+        **kwargs,
+    ) -> LLMResponse:
+        """Chat with Gemini using the generateContent API."""
+        if not self.api_key:
+            raise RuntimeError("Gemini API key not configured. Set GEMINI_API_KEY environment variable.")
+
+        client = await self._get_client()
+        model = model or self.default_model
+        temperature = temperature if temperature is not None else settings.LLM_TEMPERATURE
+        max_tokens = max_tokens if max_tokens is not None else settings.LLM_MAX_TOKENS
+
+        # Build request
+        contents, system_instruction = self._build_contents(messages)
+
+        payload = {
+            "contents": contents,
+            "generationConfig": {
+                "temperature": temperature,
+                "maxOutputTokens": max_tokens,
+            },
+        }
+
+        if system_instruction:
+            payload["systemInstruction"] = system_instruction
+
+        if stop:
+            payload["generationConfig"]["stopSequences"] = stop
+
+        # Build URL with API key
+        url = f"{self.base_url}/models/{model}:generateContent?key={self.api_key}"
+
+        try:
+            response = await client.post(url, json=payload)
+            response.raise_for_status()
+            data = response.json()
+
+            # Extract response content
+            candidates = data.get("candidates", [])
+            if not candidates:
+                raise RuntimeError("No response candidates from Gemini")
+
+            candidate = candidates[0]
+            content_parts = candidate.get("content", {}).get("parts", [])
+            content = "".join(part.get("text", "") for part in content_parts)
+
+            # Extract usage metadata
+            usage_metadata = data.get("usageMetadata", {})
+
+            return LLMResponse(
+                content=content,
+                model=model,
+                provider=self.provider_name,
+                usage={
+                    "prompt_tokens": usage_metadata.get("promptTokenCount", 0),
+                    "completion_tokens": usage_metadata.get("candidatesTokenCount", 0),
+                    "total_tokens": usage_metadata.get("totalTokenCount", 0),
+                },
+                finish_reason=candidate.get("finishReason", "STOP"),
+                raw_response=data,
+            )
+        except httpx.TimeoutException as e:
+            logger.error(f"Gemini generate timeout after {self.timeout}s: {type(e).__name__}")
+            raise RuntimeError(f"Gemini API timeout after {self.timeout}s")
+        except httpx.HTTPStatusError as e:
+            error_detail = ""
+            try:
+                error_data = e.response.json()
+                error_detail = error_data.get("error", {}).get("message", str(e))
+            except Exception:
+                error_detail = str(e)
+            logger.error(f"Gemini API error: {error_detail}")
+            raise RuntimeError(f"Gemini API error: {error_detail}")
+        except httpx.HTTPError as e:
+            error_msg = str(e) or f"{type(e).__name__}: HTTP error occurred"
+            logger.error(f"Gemini API error: {error_msg}")
+            raise RuntimeError(f"Gemini API error: {error_msg}")
+
+    async def generate_stream(
+        self,
+        prompt: str,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        system: Optional[str] = None,
+        **kwargs,
+    ) -> AsyncIterator[str]:
+        """Stream generation from Gemini."""
+        messages = [{"role": "user", "content": prompt}]
+        if system:
+            messages.insert(0, {"role": "system", "content": system})
+
+        async for chunk in self.chat_stream(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **kwargs,
+        ):
+            yield chunk
+
+    async def chat_stream(
+        self,
+        messages: List[Dict[str, str]],
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs,
+    ) -> AsyncIterator[str]:
+        """Stream chat from Gemini."""
+        if not self.api_key:
+            raise RuntimeError("Gemini API key not configured")
+
+        client = await self._get_client()
+        model = model or self.default_model
+        temperature = temperature if temperature is not None else settings.LLM_TEMPERATURE
+        max_tokens = max_tokens if max_tokens is not None else settings.LLM_MAX_TOKENS
+
+        contents, system_instruction = self._build_contents(messages)
+
+        payload = {
+            "contents": contents,
+            "generationConfig": {
+                "temperature": temperature,
+                "maxOutputTokens": max_tokens,
+            },
+        }
+
+        if system_instruction:
+            payload["systemInstruction"] = system_instruction
+
+        url = f"{self.base_url}/models/{model}:streamGenerateContent?key={self.api_key}&alt=sse"
+
+        try:
+            async with client.stream("POST", url, json=payload) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if line.startswith("data: "):
+                        data_str = line[6:]
+                        if data_str.strip():
+                            import json
+                            data = json.loads(data_str)
+                            candidates = data.get("candidates", [])
+                            if candidates:
+                                parts = candidates[0].get("content", {}).get("parts", [])
+                                for part in parts:
+                                    if "text" in part:
+                                        yield part["text"]
+        except httpx.HTTPError as e:
+            logger.error(f"Gemini stream error: {e}")
+            raise RuntimeError(f"Gemini API error: {e}")
+
+    async def list_models(self) -> List[str]:
+        """List available Gemini models."""
+        if not self.api_key:
+            return []
+
+        client = await self._get_client()
+        try:
+            url = f"{self.base_url}/models?key={self.api_key}"
+            response = await client.get(url)
+            response.raise_for_status()
+            data = response.json()
+            return [
+                model["name"].replace("models/", "")
+                for model in data.get("models", [])
+                if "generateContent" in model.get("supportedGenerationMethods", [])
+            ]
+        except httpx.HTTPError as e:
+            logger.error(f"Gemini list models error: {e}")
+            return [
+                "gemini-2.0-flash",
+                "gemini-1.5-flash",
+                "gemini-1.5-pro",
+                "gemini-pro",
+            ]
+
+    async def health_check(self) -> bool:
+        """Check if Gemini API is accessible."""
+        if not self.api_key:
+            return False
+        try:
+            models = await self.list_models()
+            return len(models) > 0
+        except Exception:
+            return False
+
+
+class PerplexityProvider(LLMProvider):
+    """
+    Perplexity AI LLM provider (Sonar models).
+
+    Supports Sonar models with built-in web search capabilities.
+    Uses OpenAI-compatible API format.
+
+    Models:
+    - sonar: Latest Sonar model with search
+    - sonar-pro: Advanced Sonar with deeper search
+    - sonar-reasoning: Sonar with extended reasoning
+    """
+
+    provider_name = "perplexity"
+
+    # Available Sonar models
+    SONAR_MODELS = [
+        "sonar",
+        "sonar-pro",
+        "sonar-reasoning",
+        "sonar-deep-research",
+    ]
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        default_model: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ):
+        self.api_key = api_key or settings.PERPLEXITY_API_KEY
+        self.base_url = (base_url or "https://api.perplexity.ai").rstrip("/")
+        self.default_model = default_model or "sonar"
+        self.timeout = timeout or settings.LLM_TIMEOUT
+        self._client: Optional[httpx.AsyncClient] = None
+
+        if not self.api_key:
+            logger.warning("Perplexity API key not configured")
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Get or create the HTTP client."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                base_url=self.base_url,
+                timeout=httpx.Timeout(self.timeout),
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+            )
+        return self._client
+
+    async def close(self):
+        """Close the HTTP client."""
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
+            self._client = None
+
+    async def generate(
+        self,
+        prompt: str,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        stop: Optional[List[str]] = None,
+        system: Optional[str] = None,
+        **kwargs,
+    ) -> LLMResponse:
+        """Generate using Perplexity's chat completions API."""
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        return await self.chat(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stop=stop,
+            **kwargs,
+        )
+
+    async def chat(
+        self,
+        messages: List[Dict[str, str]],
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        stop: Optional[List[str]] = None,
+        system_prompt: Optional[str] = None,
+        return_citations: bool = False,
+        return_related_questions: bool = False,
+        **kwargs,
+    ) -> LLMResponse:
+        """
+        Chat with Perplexity using the chat completions API.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            model: Model name (sonar, sonar-pro, sonar-reasoning)
+            temperature: Sampling temperature (0.0-2.0)
+            max_tokens: Maximum tokens to generate
+            stop: Stop sequences
+            system_prompt: System prompt (added to messages if provided)
+            return_citations: Include citations in response
+            return_related_questions: Include related questions
+
+        Returns:
+            LLMResponse with content and metadata
+        """
+        if not self.api_key:
+            raise RuntimeError("Perplexity API key not configured. Set PERPLEXITY_API_KEY environment variable.")
+
+        client = await self._get_client()
+        model = model or self.default_model
+        temperature = temperature if temperature is not None else settings.LLM_TEMPERATURE
+        max_tokens = max_tokens if max_tokens is not None else settings.LLM_MAX_TOKENS
+
+        # Prepare messages with optional system prompt
+        chat_messages = list(messages)
+        if system_prompt:
+            # Insert system message at beginning if not already present
+            if not any(m.get("role") == "system" for m in chat_messages):
+                chat_messages.insert(0, {"role": "system", "content": system_prompt})
+
+        payload = {
+            "model": model,
+            "messages": chat_messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+
+        if stop:
+            payload["stop"] = stop
+
+        # Perplexity-specific options
+        if return_citations:
+            payload["return_citations"] = True
+        if return_related_questions:
+            payload["return_related_questions"] = True
+
+        try:
+            response = await client.post("/chat/completions", json=payload)
+            response.raise_for_status()
+            data = response.json()
+
+            choice = data.get("choices", [{}])[0]
+            message = choice.get("message", {})
+            usage = data.get("usage", {})
+
+            # Build response content
+            content = message.get("content", "")
+
+            # Include citations if available
+            citations = data.get("citations", [])
+
+            return LLMResponse(
+                content=content,
+                model=model,
+                provider=self.provider_name,
+                usage={
+                    "prompt_tokens": usage.get("prompt_tokens", 0),
+                    "completion_tokens": usage.get("completion_tokens", 0),
+                    "total_tokens": usage.get("total_tokens", 0),
+                },
+                finish_reason=choice.get("finish_reason"),
+                raw_response={
+                    **data,
+                    "citations": citations,
+                    "related_questions": data.get("related_questions", []),
+                },
+            )
+        except httpx.TimeoutException as e:
+            logger.error(f"Perplexity API timeout after {self.timeout}s: {type(e).__name__}")
+            raise RuntimeError(f"Perplexity API timeout after {self.timeout}s")
+        except httpx.HTTPStatusError as e:
+            error_detail = ""
+            try:
+                error_data = e.response.json()
+                error_detail = error_data.get("error", {}).get("message", str(e))
+            except Exception:
+                error_detail = str(e)
+            logger.error(f"Perplexity API error: {error_detail}")
+            raise RuntimeError(f"Perplexity API error: {error_detail}")
+        except httpx.HTTPError as e:
+            error_msg = str(e) or f"{type(e).__name__}: HTTP error occurred"
+            logger.error(f"Perplexity API error: {error_msg}")
+            raise RuntimeError(f"Perplexity API error: {error_msg}")
+
+    async def generate_stream(
+        self,
+        prompt: str,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        system: Optional[str] = None,
+        **kwargs,
+    ) -> AsyncIterator[str]:
+        """Stream generation from Perplexity."""
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        async for chunk in self.chat_stream(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **kwargs,
+        ):
+            yield chunk
+
+    async def chat_stream(
+        self,
+        messages: List[Dict[str, str]],
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs,
+    ) -> AsyncIterator[str]:
+        """Stream chat from Perplexity."""
+        if not self.api_key:
+            raise RuntimeError("Perplexity API key not configured")
+
+        client = await self._get_client()
+        model = model or self.default_model
+        temperature = temperature if temperature is not None else settings.LLM_TEMPERATURE
+        max_tokens = max_tokens if max_tokens is not None else settings.LLM_MAX_TOKENS
+
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
+
+        try:
+            async with client.stream("POST", "/chat/completions", json=payload) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if line.startswith("data: "):
+                        data_str = line[6:]
+                        if data_str.strip() == "[DONE]":
+                            break
+                        import json
+                        data = json.loads(data_str)
+                        delta = data.get("choices", [{}])[0].get("delta", {})
+                        if "content" in delta:
+                            yield delta["content"]
+        except httpx.HTTPError as e:
+            logger.error(f"Perplexity stream error: {e}")
+            raise RuntimeError(f"Perplexity API error: {e}")
+
+    async def list_models(self) -> List[str]:
+        """List available Perplexity Sonar models."""
+        return self.SONAR_MODELS
+
+    async def health_check(self) -> bool:
+        """Check if Perplexity API is accessible."""
+        if not self.api_key:
+            return False
+        try:
+            # Make a minimal request to verify API access
+            client = await self._get_client()
+            response = await client.post(
+                "/chat/completions",
+                json={
+                    "model": "sonar",
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "max_tokens": 5,
+                },
+            )
+            return response.status_code == 200
+        except Exception as e:
+            logger.debug(f"Perplexity health check failed: {e}")
+            return False
+
+
 # Provider registry - stores singleton instances
 _providers: Dict[str, LLMProvider] = {}
 
@@ -887,9 +1468,13 @@ def get_llm_provider(
 
     # Create new provider instance
     provider_classes = {
+        LLMProviderType.GEMINI.value: GeminiProvider,
+        LLMProviderType.PERPLEXITY.value: PerplexityProvider,
         LLMProviderType.OPENAI.value: OpenAIProvider,
         LLMProviderType.OLLAMA.value: OllamaProvider,
         LLMProviderType.AWS_BEDROCK.value: AWSBedrockProvider,
+        "gemini": GeminiProvider,
+        "perplexity": PerplexityProvider,
         "openai": OpenAIProvider,
         "ollama": OllamaProvider,
         "aws_bedrock": AWSBedrockProvider,
@@ -927,6 +1512,8 @@ __all__ = [
     "LLMProvider",
     "LLMResponse",
     "LLMConfig",
+    "GeminiProvider",
+    "PerplexityProvider",
     "OllamaProvider",
     "OpenAIProvider",
     "AWSBedrockProvider",

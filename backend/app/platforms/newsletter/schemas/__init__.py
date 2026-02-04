@@ -124,6 +124,15 @@ class ApproveCheckpointRequest(BaseModel):
     feedback: Optional[str] = None
 
 
+from app.platforms.newsletter.schemas.research import (
+    ResearchRequest,
+    CustomResearchRequest,
+    TrendingRequest,
+    ArticleResponse,
+    ResearchMetadata,
+    ResearchResponse,
+)
+
 __all__ = [
     "NewsletterStatus",
     "Tone",
@@ -137,4 +146,11 @@ __all__ = [
     "WorkflowStatusResponse",
     "CheckpointResponse",
     "ApproveCheckpointRequest",
+    # Research schemas (Phase 6A)
+    "ResearchRequest",
+    "CustomResearchRequest",
+    "TrendingRequest",
+    "ArticleResponse",
+    "ResearchMetadata",
+    "ResearchResponse",
 ]

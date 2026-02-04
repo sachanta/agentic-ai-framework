@@ -76,7 +76,7 @@ class ResearchAgent(BaseAgent):
         )
 
         self.tavily = tavily_service or get_tavily_service()
-        self.memory = get_memory_service()
+        self.cache_service = get_memory_service()  # For caching, not conversation memory
         self.use_llm_for_scoring = use_llm_for_scoring
         self.cache_results = cache_results
 
@@ -123,7 +123,7 @@ class ResearchAgent(BaseAgent):
             # Check cache first
             cache_key = self._generate_cache_key(topics)
             if self.cache_results:
-                cached = await self.memory.get_research_results(user_id, cache_key)
+                cached = await self.cache_service.get_research_results(user_id, cache_key)
                 if cached:
                     logger.info(f"Returning cached research results for {topics}")
                     return {
@@ -157,7 +157,7 @@ class ResearchAgent(BaseAgent):
 
             # Cache results
             if self.cache_results and filtered_results:
-                await self.memory.set_research_results(user_id, cache_key, filtered_results)
+                await self.cache_service.set_research_results(user_id, cache_key, filtered_results)
 
             return {
                 "success": True,
@@ -490,7 +490,9 @@ class ResearchAgent(BaseAgent):
             elif "```" in content:
                 content = content.split("```")[1].split("```")[0]
 
-            summaries = json.loads(content.strip())
+            # Try to fix common JSON issues
+            content = self._repair_json(content.strip())
+            summaries = json.loads(content)
 
             # Apply summaries to articles
             for item in summaries:
@@ -501,11 +503,44 @@ class ResearchAgent(BaseAgent):
 
         except Exception as e:
             logger.warning(f"Batch summarization failed: {e}")
-            # Fallback to individual summaries
+            # Fallback to individual LLM summaries
+            logger.info("Falling back to individual summarization")
             for article in articles:
-                article["summary"] = self._fallback_summary(article)
+                try:
+                    summary = await self._summarize_single(article)
+                    article["summary"] = summary
+                except Exception as e2:
+                    logger.warning(f"Individual summarization failed: {e2}")
+                    article["summary"] = self._fallback_summary(article)
 
         return articles
+
+    def _repair_json(self, content: str) -> str:
+        """
+        Attempt to repair common JSON issues from LLM output.
+
+        Args:
+            content: Raw JSON string
+
+        Returns:
+            Repaired JSON string
+        """
+        # Remove trailing commas before ] or }
+        import re
+        content = re.sub(r',\s*]', ']', content)
+        content = re.sub(r',\s*}', '}', content)
+
+        # Try to fix unterminated strings by finding unclosed quotes
+        # Count quotes - if odd, the string might be truncated
+        if content.count('"') % 2 != 0:
+            # Try to close the JSON array properly
+            if not content.rstrip().endswith(']'):
+                # Find the last complete object
+                last_brace = content.rfind('}')
+                if last_brace > 0:
+                    content = content[:last_brace + 1] + ']'
+
+        return content
 
     def _fallback_summary(self, article: Dict[str, Any]) -> str:
         """

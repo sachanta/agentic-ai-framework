@@ -37,11 +37,19 @@ class Settings(BaseSettings):
     WEAVIATE_API_KEY: str | None = None
 
     # LLM Configuration (provider-agnostic)
-    LLM_PROVIDER: str = "ollama"  # ollama | openai | aws_bedrock
-    LLM_DEFAULT_MODEL: str = "llama3"  # Default model for chosen provider
+    LLM_PROVIDER: str = "gemini"  # gemini | perplexity | ollama | openai | aws_bedrock
+    LLM_DEFAULT_MODEL: str = "gemini-2.0-flash"  # Default model for chosen provider
     LLM_TEMPERATURE: float = 0.7
     LLM_MAX_TOKENS: int = 1000
     LLM_TIMEOUT: float = 120.0
+
+    # Gemini Configuration (default provider)
+    GEMINI_API_KEY: str | None = None
+    GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
+
+    # Perplexity Configuration (Sonar models with search)
+    PERPLEXITY_API_KEY: str | None = None
+    PERPLEXITY_BASE_URL: str = "https://api.perplexity.ai"
 
     # Ollama Configuration
     OLLAMA_BASE_URL: str = "http://localhost:11434"

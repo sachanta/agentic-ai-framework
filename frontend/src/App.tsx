@@ -13,6 +13,7 @@ import DashboardPage from '@/pages/DashboardPage';
 import AppsPage from '@/pages/AppsPage';
 import AppDetailPage from '@/pages/AppDetailPage';
 import HelloWorldPage from '@/pages/apps/HelloWorldPage';
+import NewsletterPage from '@/pages/apps/NewsletterPage';
 import AgentsPage from '@/pages/AgentsPage';
 import AgentDetailPage from '@/pages/AgentDetailPage';
 import ToolsPage from '@/pages/ToolsPage';
@@ -60,6 +61,7 @@ function App() {
               <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
               <Route path={ROUTES.APPS} element={<AppsPage />} />
               <Route path={ROUTES.HELLO_WORLD_APP} element={<HelloWorldPage />} />
+              <Route path={ROUTES.NEWSLETTER_APP} element={<NewsletterPage />} />
               <Route path={ROUTES.APP_DETAIL} element={<AppDetailPage />} />
               <Route path={ROUTES.AGENTS} element={<AgentsPage />} />
               <Route path="/agents/:id" element={<AgentDetailPage />} />

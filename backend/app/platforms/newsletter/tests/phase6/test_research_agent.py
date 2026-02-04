@@ -81,6 +81,39 @@ class TestLLMConfig:
         assert config["temperature"] == 0.3
         assert config["max_tokens"] == 200
 
+    @patch("app.platforms.newsletter.agents.research.llm.get_llm_provider")
+    def test_get_research_llm_uses_correct_kwargs(self, mock_get_provider):
+        """
+        Test get_research_llm passes correct kwargs to get_llm_provider.
+
+        This catches issues like passing 'model' instead of 'default_model'.
+        OllamaProvider.__init__ accepts 'default_model', not 'model'.
+        """
+        mock_get_provider.return_value = MagicMock()
+
+        llm = get_research_llm()
+
+        mock_get_provider.assert_called_once()
+        call_kwargs = mock_get_provider.call_args.kwargs
+
+        # Should use 'default_model', NOT 'model'
+        assert "model" not in call_kwargs, \
+            "Use 'default_model' not 'model' - OllamaProvider doesn't accept 'model'"
+        assert "default_model" in call_kwargs, \
+            "Should pass 'default_model' to get_llm_provider"
+        assert "provider_type" in call_kwargs, \
+            "Should pass 'provider_type' to get_llm_provider"
+
+    @patch("app.platforms.newsletter.agents.research.llm.get_llm_provider")
+    def test_get_research_llm_returns_provider(self, mock_get_provider):
+        """Test get_research_llm returns the LLM provider."""
+        mock_provider = MagicMock()
+        mock_get_provider.return_value = mock_provider
+
+        llm = get_research_llm()
+
+        assert llm is mock_provider
+
 
 class TestPrompts:
     """Tests for prompt templates."""

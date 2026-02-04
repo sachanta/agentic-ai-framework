@@ -16,8 +16,12 @@ from app.platforms.newsletter.schemas import (
 )
 from app.platforms.newsletter.services import NewsletterService
 from app.platforms.newsletter.config import config
+from app.platforms.newsletter.routers import research_router
 
 router = APIRouter()
+
+# Include modular routers
+router.include_router(research_router)
 
 
 @router.get("/status", response_model=PlatformStatusResponse)
