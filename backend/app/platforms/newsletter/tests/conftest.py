@@ -144,7 +144,6 @@ def valid_generate_request():
         "tone": "professional",
         "max_articles": 10,
         "custom_prompt": None,
-        "include_mindmap": True,
     }
 
 

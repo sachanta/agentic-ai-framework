@@ -76,7 +76,6 @@ class TestGenerateNewsletterRequest:
         assert request.tone.value == "professional"  # default
         assert request.max_articles == 10  # default
         assert request.custom_prompt is None  # default
-        assert request.include_mindmap is True  # default
 
     def test_valid_request_with_all_fields(self):
         """Test creating request with all fields."""
@@ -87,14 +86,12 @@ class TestGenerateNewsletterRequest:
             tone=Tone.CASUAL,
             max_articles=5,
             custom_prompt="Focus on recent breakthroughs",
-            include_mindmap=False,
         )
 
         assert request.topics == ["AI", "healthcare"]
         assert request.tone == Tone.CASUAL
         assert request.max_articles == 5
         assert request.custom_prompt == "Focus on recent breakthroughs"
-        assert request.include_mindmap is False
 
     def test_invalid_request_missing_topics(self):
         """Test that topics field is required."""
@@ -131,7 +128,6 @@ class TestCustomPromptRequest:
         request = CustomPromptRequest(prompt="Write about AI trends")
 
         assert request.prompt == "Write about AI trends"
-        assert request.include_mindmap is True  # default
 
     def test_invalid_request_missing_prompt(self):
         """Test that prompt field is required."""

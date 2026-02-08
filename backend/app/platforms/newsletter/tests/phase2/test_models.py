@@ -103,7 +103,6 @@ class TestSubscriberModel:
         assert prefs.topics == ["AI", "tech"]
         assert prefs.tone == "casual"
         assert prefs.frequency == "daily"
-        assert prefs.include_mindmap is True  # default
 
     def test_engagement_metrics_model(self):
         """Test EngagementMetrics model."""

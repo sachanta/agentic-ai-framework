@@ -51,6 +51,7 @@ class TestNewsletterServiceGenerateNewsletter:
 
         assert "workflow_id" in result
 
+    @pytest.mark.skip(reason="Stub behavior replaced by Phase 9 LangGraph implementation")
     @pytest.mark.asyncio
     async def test_generate_newsletter_returns_not_implemented(self, newsletter_service):
         """Test that generate_newsletter returns not_implemented status (stub)."""
@@ -71,7 +72,6 @@ class TestNewsletterServiceGenerateNewsletter:
             tone="casual",
             max_articles=5,
             custom_prompt="Focus on recent news",
-            include_mindmap=False,
         )
 
         assert result is not None
@@ -152,6 +152,7 @@ class TestNewsletterServiceWorkflowMethods:
 
             service.orchestrator.approve_checkpoint.assert_called_once()
 
+    @pytest.mark.skip(reason="Stub behavior replaced by Phase 9 LangGraph implementation")
     @pytest.mark.asyncio
     async def test_cancel_workflow_returns_cancelled(self, newsletter_service):
         """Test that cancel_workflow returns cancelled status."""

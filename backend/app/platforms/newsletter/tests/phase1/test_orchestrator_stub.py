@@ -1,8 +1,8 @@
 """
 Newsletter Orchestrator stub tests.
 
-These tests verify Phase 1 stub behavior of the orchestrator.
-EXPECTED TO FAIL after Phase 10 when LangGraph implementation is added.
+These tests verified Phase 1 stub behavior of the orchestrator.
+Now superseded by Phase 9 LangGraph implementation.
 
 Marker: @pytest.mark.phase1_stub
 """
@@ -11,7 +11,11 @@ import pytest
 
 @pytest.mark.phase1_stub
 class TestNewsletterOrchestratorStub:
-    """Test Phase 1 stub behavior of NewsletterOrchestrator."""
+    """Test Phase 1 stub behavior of NewsletterOrchestrator.
+
+    Note: These tests are for the original stub implementation.
+    After Phase 9, the orchestrator has real LangGraph functionality.
+    """
 
     def test_orchestrator_instantiation(self, newsletter_orchestrator):
         """Test that orchestrator can be instantiated."""
@@ -23,6 +27,7 @@ class TestNewsletterOrchestratorStub:
         assert newsletter_orchestrator.description is not None
         assert len(newsletter_orchestrator.description) > 0
 
+    @pytest.mark.skip(reason="Stub behavior replaced by Phase 9 LangGraph implementation")
     @pytest.mark.asyncio
     async def test_run_returns_not_implemented(self, newsletter_orchestrator):
         """Test that run() returns not_implemented status (stub behavior)."""
@@ -34,6 +39,7 @@ class TestNewsletterOrchestratorStub:
         assert result["status"] == "not_implemented"
         assert "workflow_id" in result
 
+    @pytest.mark.skip(reason="Stub behavior replaced by Phase 9 LangGraph implementation")
     @pytest.mark.asyncio
     async def test_run_returns_placeholder_workflow_id(self, newsletter_orchestrator):
         """Test that run() returns a placeholder workflow_id."""
@@ -41,6 +47,7 @@ class TestNewsletterOrchestratorStub:
 
         assert result["workflow_id"] == "placeholder"
 
+    @pytest.mark.skip(reason="Stub behavior replaced by Phase 9 LangGraph implementation")
     @pytest.mark.asyncio
     async def test_run_returns_message(self, newsletter_orchestrator):
         """Test that run() returns a message about Phase 10."""
@@ -49,6 +56,7 @@ class TestNewsletterOrchestratorStub:
         assert "message" in result
         assert "Phase 10" in result["message"]
 
+    @pytest.mark.skip(reason="Stub behavior replaced by Phase 9 LangGraph implementation")
     @pytest.mark.asyncio
     async def test_get_workflow_status_returns_not_implemented(self, newsletter_orchestrator):
         """Test that get_workflow_status() returns not_implemented."""
@@ -63,6 +71,7 @@ class TestNewsletterOrchestratorStub:
 
         assert result is None
 
+    @pytest.mark.skip(reason="Stub behavior replaced by Phase 9 LangGraph implementation")
     @pytest.mark.asyncio
     async def test_approve_checkpoint_returns_not_implemented(self, newsletter_orchestrator):
         """Test that approve_checkpoint() returns not_implemented."""
@@ -74,6 +83,7 @@ class TestNewsletterOrchestratorStub:
 
         assert result["status"] == "not_implemented"
 
+    @pytest.mark.skip(reason="Stub behavior replaced by Phase 9 LangGraph implementation")
     @pytest.mark.asyncio
     async def test_cancel_workflow_returns_cancelled(self, newsletter_orchestrator):
         """Test that cancel_workflow() returns cancelled status."""

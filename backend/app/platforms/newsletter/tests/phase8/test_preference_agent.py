@@ -155,7 +155,6 @@ class TestPreferenceAgentGetPreferences:
             "frequency": "daily",
             "max_articles": 15,
             "include_summaries": True,
-            "include_mindmap": False,
             "sources_blacklist": [],
             "sources_whitelist": [],
             "language": "en",

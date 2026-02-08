@@ -45,7 +45,7 @@ class TestStatusEndpoint:
         data = response.json()
         assert "agents" in data
         assert isinstance(data["agents"], list)
-        assert len(data["agents"]) == 5
+        assert len(data["agents"]) == 4  # research, writing, preference, custom_prompt
 
     def test_status_includes_llm_info(self, test_client):
         """Test that /status includes LLM provider and model."""
@@ -151,11 +151,11 @@ class TestAgentsEndpoint:
         data = response.json()
         assert isinstance(data, list)
 
-    def test_agents_returns_five_agents(self, test_client):
-        """Test that /agents returns 5 agents."""
+    def test_agents_returns_four_agents(self, test_client):
+        """Test that /agents returns 4 agents (after mindmap removal)."""
         response = test_client.get("/api/v1/platforms/newsletter/agents")
         data = response.json()
-        assert len(data) == 5
+        assert len(data) == 4
 
     def test_agents_have_required_fields(self, test_client):
         """Test that each agent has required fields."""
@@ -169,12 +169,12 @@ class TestAgentsEndpoint:
             assert "status" in agent
 
     def test_agents_include_expected_ids(self, test_client):
-        """Test that expected agent IDs are present."""
+        """Test that expected agent IDs are present (4 agents after mindmap removal)."""
         response = test_client.get("/api/v1/platforms/newsletter/agents")
         data = response.json()
 
         agent_ids = {agent["id"] for agent in data}
-        expected_ids = {"research", "writing", "preference", "custom_prompt", "mindmap"}
+        expected_ids = {"research", "writing", "preference", "custom_prompt"}
         assert agent_ids == expected_ids
 
 
@@ -182,6 +182,7 @@ class TestAgentsEndpoint:
 class TestAgentsEndpointStub:
     """Test Phase 1 specific agent status - will change after Phase 6-9."""
 
+    @pytest.mark.skip(reason="Agent status now varies - research/writing/preference/custom_prompt are implemented")
     def test_all_agents_pending_status(self, test_client):
         """Test that all agents have 'pending' status in Phase 1."""
         response = test_client.get("/api/v1/platforms/newsletter/agents")
