@@ -1,109 +1,110 @@
-# Phase 13: Frontend - Types, API Client, Hooks
+# Phase 13: Frontend - Pages & Components
 
 ## Goal
-Frontend infrastructure for newsletter platform
+Newsletter platform UI with HITL approval workflow
 
 ## Status
 - [ ] Not Started
 
 ## Files to Create
+
+### Pages
 ```
-frontend/src/types/newsletter.ts
-frontend/src/api/newsletter.ts
-frontend/src/hooks/useNewsletter.ts
-frontend/src/store/newsletterStore.ts
-```
-
-## Types
-```typescript
-// newsletter.ts
-interface Newsletter {
-  id: string;
-  user_id: string;
-  title: string;
-  content: string;
-  html_content: string;
-  status: NewsletterStatus;
-  topics_covered: string[];
-  tone_used: string;
-  word_count: number;
-  created_at: string;
-}
-
-interface Campaign {
-  id: string;
-  name: string;
-  subject: string;
-  status: CampaignStatus;
-  newsletter_id?: string;
-  analytics: CampaignAnalytics;
-}
-
-interface Subscriber {
-  id: string;
-  email: string;
-  name?: string;
-  status: SubscriberStatus;
-  preferences: SubscriberPreferences;
-  engagement: EngagementMetrics;
-}
-
-interface WorkflowStatus {
-  workflow_id: string;
-  status: 'running' | 'awaiting_approval' | 'completed' | 'cancelled' | 'failed';
-  current_checkpoint?: string;
-  checkpoint_data?: Record<string, any>;
-}
+frontend/src/pages/apps/NewsletterPage.tsx
+frontend/src/pages/newsletter/
+├── CampaignsPage.tsx
+├── CampaignDetailPage.tsx
+├── SubscribersPage.tsx
+├── TemplatesPage.tsx
+├── AnalyticsPage.tsx
+└── WorkflowPage.tsx            # Active workflow management
 ```
 
-## API Client Methods
-```typescript
-// newsletter.ts
-const newsletterApi = {
-  // Newsletters
-  generateNewsletter: (request: GenerateRequest) => Promise<WorkflowStatus>,
-  getNewsletters: (params?: ListParams) => Promise<Newsletter[]>,
-  getNewsletter: (id: string) => Promise<Newsletter>,
-  deleteNewsletter: (id: string) => Promise<void>,
-
-  // Workflows
-  getWorkflowStatus: (id: string) => Promise<WorkflowStatus>,
-  approveCheckpoint: (id: string, data: ApproveRequest) => Promise<WorkflowStatus>,
-  cancelWorkflow: (id: string) => Promise<void>,
-
-  // Campaigns, Subscribers, Templates...
-};
+### Components
+```
+frontend/src/components/apps/newsletter/
+├── NewsletterApp.tsx           # Main app component
+├── NewsletterDashboard.tsx     # Overview dashboard
+├── CampaignForm.tsx            # Create/edit campaign
+├── CampaignList.tsx            # Campaign listing
+├── CampaignCard.tsx            # Campaign card
+├── SubscriberManager.tsx       # Subscriber management
+├── SubscriberImport.tsx        # Bulk import
+├── TemplateEditor.tsx          # Template editing
+├── TemplatePreview.tsx         # Template preview
+├── NewsletterPreview.tsx       # Newsletter preview
+├── GeneratePanel.tsx           # Newsletter generation
+├── CustomPromptInput.tsx       # Custom prompt UI
+├── AnalyticsCharts.tsx         # Analytics visualization
+├── SchedulePanel.tsx           # Scheduling UI
+├── PreferencesForm.tsx         # User preferences
+│
+│   # HITL Workflow Components
+├── workflow/
+│   ├── WorkflowTracker.tsx     # Visual progress tracker
+│   ├── CheckpointPanel.tsx     # Checkpoint approval panel
+│   ├── ArticleReview.tsx       # Checkpoint 1: Article selection
+│   ├── ContentReview.tsx       # Checkpoint 2: Newsletter content
+│   ├── SubjectReview.tsx       # Checkpoint 3: Subject lines
+│   ├── FinalApproval.tsx       # Checkpoint 4: Send approval
+│   ├── WorkflowHistory.tsx     # Execution history
+│   └── ApprovalActions.tsx     # Approve/Edit/Reject buttons
 ```
 
-## Hooks
-```typescript
-// useNewsletter.ts
-const useNewsletters = () => useQuery(['newsletters'], ...);
-const useNewsletter = (id: string) => useQuery(['newsletter', id], ...);
-const useGenerateNewsletter = () => useMutation(...);
-const useWorkflowStatus = (id: string) => useQuery(['workflow', id], ...);
-const useApproveCheckpoint = () => useMutation(...);
+## HITL Workflow UI
+
+### Workflow Tracker
+```
+●────────●────────◉────────○────────○
+Prefs    Research  Review   Write    Send
+✓        ✓         ⏳       ...      ...
 ```
 
-## Store (Zustand)
-```typescript
-// newsletterStore.ts
-interface NewsletterStore {
-  activeWorkflowId: string | null;
-  setActiveWorkflow: (id: string | null) => void;
-  checkpointData: Record<string, any> | null;
-  setCheckpointData: (data: Record<string, any> | null) => void;
-}
+### Checkpoint Panel Example
 ```
+┌──────────────────────────────────────────┐
+│         CHECKPOINT: Article Review        │
+│                                          │
+│  Selected 8 articles from 3 topics:       │
+│                                          │
+│  ☑ AI Breakthrough in Healthcare          │
+│    Source: TechCrunch | Score: 0.92       │
+│    [Preview] [Remove]                     │
+│                                          │
+│  ☑ New Climate Tech Funding               │
+│    Source: Reuters | Score: 0.88          │
+│    [Preview] [Remove]                     │
+│                                          │
+│  [+ Add Article]  [Reorder]  [Re-search] │
+│                                          │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ │
+│  │ Approve  │ │   Edit   │ │  Reject  │ │
+│  └──────────┘ └──────────┘ └──────────┘ │
+└──────────────────────────────────────────┘
+```
+
+## Checkpoint-Specific UI
+
+| Checkpoint | Component | Features |
+|------------|-----------|----------|
+| Article Review | `ArticleReview.tsx` | Drag-to-reorder, remove, add URL, scores |
+| Content Review | `ContentReview.tsx` | Rich text editor, side-by-side preview |
+| Subject Review | `SubjectReview.tsx` | 5 options as radio cards, custom input |
+| Final Approval | `FinalApproval.tsx` | Full preview, recipient count, schedule picker |
+
+## Real-time Updates
+- SSE connection for workflow progress
+- Toast notifications for checkpoint arrival
+- Auto-refresh on approval/rejection
 
 ## Dependencies
-- Phase 12 (Backend API)
-- React Query (for data fetching)
-- Zustand (for state management)
+- Phase 12 (Types, API, Hooks)
+- React, TypeScript
+- Tailwind CSS (styling)
 
 ## Verification
-- [ ] All types match backend schemas
-- [ ] API client methods work
-- [ ] Hooks fetch data correctly
-- [ ] Store manages workflow state
+- [ ] All pages render correctly
+- [ ] HITL workflow UI functions
+- [ ] Real-time updates work
+- [ ] Responsive design
 - [ ] Tests passing

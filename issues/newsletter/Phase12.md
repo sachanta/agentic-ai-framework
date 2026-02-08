@@ -1,121 +1,109 @@
-# Phase 12: API Endpoints (Backend)
+# Phase 12: Frontend - Types, API Client, Hooks
 
 ## Goal
-Complete REST API for newsletter platform with HITL workflow support
+Frontend infrastructure for newsletter platform
 
 ## Status
 - [ ] Not Started
 
-## Files to Modify/Create
+## Files to Create
 ```
-backend/app/platforms/newsletter/router.py
-backend/app/platforms/newsletter/routers/
-├── __init__.py
-├── newsletters.py       # Newsletter CRUD
-├── workflows.py         # HITL workflow endpoints
-├── campaigns.py         # Campaign management
-├── subscribers.py       # Subscriber management
-├── templates.py         # Template management
-├── preferences.py       # User preferences
-└── analytics.py         # Analytics endpoints
+frontend/src/types/newsletter.ts
+frontend/src/api/newsletter.ts
+frontend/src/hooks/useNewsletter.ts
+frontend/src/store/newsletterStore.ts
 ```
 
-## Endpoints
+## Types
+```typescript
+// newsletter.ts
+interface Newsletter {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  html_content: string;
+  status: NewsletterStatus;
+  topics_covered: string[];
+  tone_used: string;
+  word_count: number;
+  created_at: string;
+}
 
-### Newsletter Generation & HITL Workflow
-```
-POST   /newsletters/generate           # Start generation, returns workflow_id
-POST   /newsletters/generate-custom    # Start with custom prompt
-GET    /newsletters                    # List user's newsletters
-GET    /newsletters/{id}               # Get specific newsletter
-DELETE /newsletters/{id}               # Delete newsletter
-```
+interface Campaign {
+  id: string;
+  name: string;
+  subject: string;
+  status: CampaignStatus;
+  newsletter_id?: string;
+  analytics: CampaignAnalytics;
+}
 
-### HITL Workflow Management
-```
-GET    /workflows                      # List active workflows
-GET    /workflows/{workflow_id}        # Get workflow status
-GET    /workflows/{workflow_id}/checkpoint  # Get pending checkpoint
-POST   /workflows/{workflow_id}/approve     # Approve checkpoint
-POST   /workflows/{workflow_id}/edit        # Edit and continue
-POST   /workflows/{workflow_id}/reject      # Reject and re-run
-POST   /workflows/{workflow_id}/cancel      # Cancel workflow
-GET    /workflows/{workflow_id}/history     # Execution history
-GET    /workflows/{workflow_id}/stream      # SSE for progress
-```
+interface Subscriber {
+  id: string;
+  email: string;
+  name?: string;
+  status: SubscriberStatus;
+  preferences: SubscriberPreferences;
+  engagement: EngagementMetrics;
+}
 
-### Campaigns
-```
-POST   /campaigns                      # Create campaign
-GET    /campaigns                      # List campaigns
-GET    /campaigns/{id}                 # Get campaign
-PUT    /campaigns/{id}                 # Update campaign
-DELETE /campaigns/{id}                 # Delete campaign
-POST   /campaigns/{id}/send            # Send now
-POST   /campaigns/{id}/schedule        # Schedule send
-```
-
-### Subscribers
-```
-POST   /subscribers                    # Add subscriber
-GET    /subscribers                    # List subscribers
-GET    /subscribers/{id}               # Get subscriber
-PUT    /subscribers/{id}               # Update subscriber
-DELETE /subscribers/{id}               # Remove subscriber
-POST   /subscribers/import             # Bulk import
+interface WorkflowStatus {
+  workflow_id: string;
+  status: 'running' | 'awaiting_approval' | 'completed' | 'cancelled' | 'failed';
+  current_checkpoint?: string;
+  checkpoint_data?: Record<string, any>;
+}
 ```
 
-### Preferences
-```
-GET    /preferences                    # Get user preferences
-PUT    /preferences                    # Update preferences
-POST   /preferences/analyze            # Analyze patterns
-GET    /preferences/recommendations    # Get suggestions
+## API Client Methods
+```typescript
+// newsletter.ts
+const newsletterApi = {
+  // Newsletters
+  generateNewsletter: (request: GenerateRequest) => Promise<WorkflowStatus>,
+  getNewsletters: (params?: ListParams) => Promise<Newsletter[]>,
+  getNewsletter: (id: string) => Promise<Newsletter>,
+  deleteNewsletter: (id: string) => Promise<void>,
+
+  // Workflows
+  getWorkflowStatus: (id: string) => Promise<WorkflowStatus>,
+  approveCheckpoint: (id: string, data: ApproveRequest) => Promise<WorkflowStatus>,
+  cancelWorkflow: (id: string) => Promise<void>,
+
+  // Campaigns, Subscribers, Templates...
+};
 ```
 
-### Templates
-```
-POST   /templates                      # Create template
-GET    /templates                      # List templates
-GET    /templates/{id}                 # Get template
-PUT    /templates/{id}                 # Update template
-DELETE /templates/{id}                 # Delete template
-```
-
-### Analytics
-```
-GET    /analytics/dashboard            # Dashboard metrics
-GET    /analytics/campaigns/{id}       # Campaign analytics
-GET    /analytics/engagement           # Engagement metrics
+## Hooks
+```typescript
+// useNewsletter.ts
+const useNewsletters = () => useQuery(['newsletters'], ...);
+const useNewsletter = (id: string) => useQuery(['newsletter', id], ...);
+const useGenerateNewsletter = () => useMutation(...);
+const useWorkflowStatus = (id: string) => useQuery(['workflow', id], ...);
+const useApproveCheckpoint = () => useMutation(...);
 ```
 
-## Response Schemas
-```python
-class WorkflowStatusResponse(BaseModel):
-    workflow_id: str
-    status: str  # running, awaiting_approval, completed, cancelled, failed
-    current_checkpoint: Optional[str]
-    checkpoint_data: Optional[dict]
-    created_at: datetime
-    updated_at: datetime
-
-class CheckpointResponse(BaseModel):
-    checkpoint_id: str
-    checkpoint_type: str
-    title: str
-    description: str
-    data: dict
-    actions: List[str]
-    metadata: dict
+## Store (Zustand)
+```typescript
+// newsletterStore.ts
+interface NewsletterStore {
+  activeWorkflowId: string | null;
+  setActiveWorkflow: (id: string | null) => void;
+  checkpointData: Record<string, any> | null;
+  setCheckpointData: (data: Record<string, any> | null) => void;
+}
 ```
 
 ## Dependencies
-- All previous phases (1-11)
-- FastAPI (already configured)
+- Phase 11 (Backend API)
+- React Query (for data fetching)
+- Zustand (for state management)
 
 ## Verification
-- [ ] All endpoints respond correctly
-- [ ] Authentication works
-- [ ] HITL workflow endpoints function
-- [ ] SSE streaming works
+- [ ] All types match backend schemas
+- [ ] API client methods work
+- [ ] Hooks fetch data correctly
+- [ ] Store manages workflow state
 - [ ] Tests passing

@@ -1,103 +1,73 @@
-# Phase 10: Newsletter Orchestrator with LangGraph HITL
+# Phase 10: Email Service Integration
 
 ## Goal
-Multi-agent workflow coordination with Human-in-the-Loop checkpoints
+Newsletter delivery via Resend API
 
 ## Status
 - [ ] Not Started
 
-## Files to Create/Modify
+## Files to Create
 ```
-backend/app/platforms/newsletter/orchestrator/
-├── __init__.py
-├── orchestrator.py      # LangGraph-based orchestrator
-├── graph.py             # LangGraph workflow definition
-├── checkpoints.py       # HITL checkpoint handlers
-└── state.py             # Workflow state schema
+backend/app/platforms/newsletter/services/email.py
 ```
 
-## Why LangGraph
-- Native `interrupt()` function for HITL checkpoints
-- State persistence across interrupts (MongoDB checkpointer)
-- Built-in approve/edit/reject workflow
-- Already in dependencies (`langgraph>=0.0.20`)
+## Features
+- Send newsletter emails with Resend
+- HTML and plain text versions
+- Retry mechanism (3 retries)
+- Delivery tracking
+- Test email support
+- OTP/Welcome emails
 
-## Workflow with HITL Checkpoints
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    NEWSLETTER GENERATION WORKFLOW                │
-├─────────────────────────────────────────────────────────────────┤
-│  1. Get user preferences (Preference Agent)                     │
-│  2. Process custom prompt if provided (Custom Prompt Agent)     │
-│  3. Research content (Research Agent)                           │
-│                         │                                        │
-│            ┌────────────▼────────────┐                          │
-│            │   🛑 CHECKPOINT 1       │                          │
-│            │   Review Article        │                          │
-│            │   Selection             │                          │
-│            │   [Approve/Edit/Reject] │                          │
-│            └────────────┬────────────┘                          │
-│                         │                                        │
-│  4. Generate newsletter (Writing Agent)                         │
-│                         │                                        │
-│            ┌────────────▼────────────┐                          │
-│            │   🛑 CHECKPOINT 2       │                          │
-│            │   Review Newsletter     │                          │
-│            │   Content               │                          │
-│            │   [Approve/Edit/Reject] │                          │
-│            └────────────┬────────────┘                          │
-│                         │                                        │
-│  5. Create subject lines (Writing Agent)                        │
-│                         │                                        │
-│            ┌────────────▼────────────┐                          │
-│            │   🛑 CHECKPOINT 3       │                          │
-│            │   Approve Tone &        │                          │
-│            │   Subject Lines         │                          │
-│            │   [Approve/Edit/Reject] │                          │
-│            └────────────┬────────────┘                          │
-│                         │                                        │
-│  6. Format for email (Writing Agent)                            │
-│  7. Store in database (MongoDB)                                 │
-│  8. Store in vector DB (Weaviate RAG)                          │
-│                         │                                        │
-│            ┌────────────▼────────────┐                          │
-│            │   🛑 CHECKPOINT 4       │                          │
-│            │   Final Send            │                          │
-│            │   Approval              │                          │
-│            │   [Send/Schedule/Cancel]│                          │
-│            └────────────┬────────────┘                          │
-│                         │                                        │
-│  9. Send if approved (Email Service)                            │
-└─────────────────────────────────────────────────────────────────┘
+## Configuration
+```python
+NEWSLETTER_RESEND_API_KEY=xxx
+NEWSLETTER_FROM_EMAIL=newsletter@yourdomain.com
+NEWSLETTER_FROM_NAME="Your Newsletter"
 ```
 
-## HITL Checkpoint Details
+## How It Helps The Project
 
-| Checkpoint | Trigger | Human Actions | Data Shown |
-|------------|---------|---------------|------------|
-| **1. Article Selection** | After research | Approve, Edit, Reject | Article titles, sources, summaries |
-| **2. Content Review** | After writing | Approve, Edit, Reject | Full preview, word count, tone |
-| **3. Tone & Subject** | After subjects | Approve, Edit, Reject | 5 subject options, tone class |
-| **4. Final Approval** | Before sending | Send, Schedule, Cancel | Final preview, recipient count |
+The Email Service is the **final delivery mechanism** for newsletters:
 
-## Orchestrator Methods
-- `start_newsletter_generation()` - Start workflow, returns workflow_id
-- `get_pending_checkpoint()` - Get current checkpoint awaiting approval
-- `approve_checkpoint()` - Approve and continue
-- `edit_checkpoint()` - Modify data and continue
-- `reject_checkpoint()` - Reject and re-run previous step
-- `cancel_workflow()` - Cancel entire workflow
-- `get_workflow_status()` - Get current state and history
+### The Flow
+1. Newsletter approved at Checkpoint 4
+2. Email Service formats content for delivery
+3. Sends to all campaign recipients
+4. Tracks delivery status and updates analytics
+
+### Key Capabilities
+
+| Capability | Description |
+|------------|-------------|
+| Multi-format | Sends both HTML and plain text versions |
+| Retry logic | Retries failed sends up to 3 times |
+| Tracking | Records delivered/bounced/opened status |
+| Test mode | Send test email before full campaign |
+
+### Resend Integration
+```python
+from resend import Resend
+
+client = Resend(api_key=config.RESEND_API_KEY)
+
+response = client.emails.send({
+    "from": f"{config.FROM_NAME} <{config.FROM_EMAIL}>",
+    "to": subscriber.email,
+    "subject": newsletter.subject_line,
+    "html": newsletter.html_content,
+    "text": newsletter.plain_text,
+})
+```
 
 ## Dependencies
-- Phases 6-9 (All agents)
-- Phase 4 (RAG for storage)
-- Phase 5 (Memory for state)
-- LangGraph (already in deps)
+- Phase 2 (Subscriber repository)
+- Phase 7 (Newsletter content)
+- Resend API (add to pyproject.toml)
 
 ## Verification
-- [ ] Workflow pauses at each checkpoint
-- [ ] State persists across interrupts
-- [ ] Approve/Edit/Reject work correctly
-- [ ] Cancel terminates workflow
+- [ ] Can send test emails
+- [ ] HTML and plain text both work
+- [ ] Retry mechanism works
+- [ ] Delivery tracking updates campaign analytics
 - [ ] Tests passing
