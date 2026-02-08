@@ -194,29 +194,29 @@ class TestAgentsEndpointStub:
 
 @pytest.mark.phase1_stub
 class TestGenerateEndpointStub:
-    """Test POST /newsletters/generate stub behavior."""
+    """Test POST /generate stub behavior."""
 
     def test_generate_requires_auth(self, test_client):
-        """Test that /newsletters/generate requires authentication."""
+        """Test that /generate requires authentication."""
         response = test_client.post(
-            "/api/v1/platforms/newsletter/newsletters/generate",
+            "/api/v1/platforms/newsletter/generate",
             json={"topics": ["AI"]},
         )
         # Should return 401 or 403 without auth
         assert response.status_code in [401, 403, 422]
 
     def test_generate_returns_workflow_id(self, authenticated_client, valid_generate_request):
-        """Test that generate returns a workflow_id (stub)."""
+        """Test that generate returns a workflow_id."""
         with patch("app.platforms.newsletter.router.NewsletterService") as MockService:
             mock_instance = MockService.return_value
             mock_instance.generate_newsletter = AsyncMock(return_value={
                 "workflow_id": "test-wf-id",
-                "status": "not_implemented",
-                "message": "Stub response",
+                "status": "awaiting_approval",
+                "message": "Newsletter generation started",
             })
 
             response = authenticated_client.post(
-                "/api/v1/platforms/newsletter/newsletters/generate",
+                "/api/v1/platforms/newsletter/generate",
                 json=valid_generate_request,
             )
 
@@ -230,12 +230,12 @@ class TestGenerateEndpointStub:
             mock_instance = MockService.return_value
             mock_instance.generate_newsletter = AsyncMock(return_value={
                 "workflow_id": "test-wf-id",
-                "status": "not_implemented",
-                "message": "Stub",
+                "status": "awaiting_approval",
+                "message": "Newsletter generation started",
             })
 
             response = authenticated_client.post(
-                "/api/v1/platforms/newsletter/newsletters/generate",
+                "/api/v1/platforms/newsletter/generate",
                 json=valid_generate_request,
             )
 
@@ -245,12 +245,12 @@ class TestGenerateEndpointStub:
 
 @pytest.mark.phase1_stub
 class TestWorkflowEndpointsStub:
-    """Test workflow endpoint stub behavior."""
+    """Test workflow endpoint behavior."""
 
     def test_get_workflow_status_404_for_nonexistent(self, authenticated_client):
         """Test that getting non-existent workflow returns 404."""
-        with patch("app.platforms.newsletter.router.NewsletterService") as MockService:
-            mock_instance = MockService.return_value
+        with patch("app.platforms.newsletter.routers.workflows.get_newsletter_orchestrator") as MockOrch:
+            mock_instance = MockOrch.return_value
             mock_instance.get_workflow_status = AsyncMock(return_value=None)
 
             response = authenticated_client.get(
@@ -261,8 +261,8 @@ class TestWorkflowEndpointsStub:
 
     def test_get_checkpoint_404_when_none_pending(self, authenticated_client):
         """Test that getting checkpoint returns 404 when none pending."""
-        with patch("app.platforms.newsletter.router.NewsletterService") as MockService:
-            mock_instance = MockService.return_value
+        with patch("app.platforms.newsletter.routers.workflows.get_newsletter_orchestrator") as MockOrch:
+            mock_instance = MockOrch.return_value
             mock_instance.get_pending_checkpoint = AsyncMock(return_value=None)
 
             response = authenticated_client.get(
@@ -273,11 +273,11 @@ class TestWorkflowEndpointsStub:
 
     def test_approve_checkpoint_accepts_request(self, authenticated_client, valid_approve_request):
         """Test that approve endpoint accepts valid request."""
-        with patch("app.platforms.newsletter.router.NewsletterService") as MockService:
-            mock_instance = MockService.return_value
+        with patch("app.platforms.newsletter.routers.workflows.get_newsletter_orchestrator") as MockOrch:
+            mock_instance = MockOrch.return_value
             mock_instance.approve_checkpoint = AsyncMock(return_value={
                 "workflow_id": "wf-123",
-                "status": "not_implemented",
+                "status": "running",
             })
 
             response = authenticated_client.post(
@@ -289,8 +289,8 @@ class TestWorkflowEndpointsStub:
 
     def test_cancel_workflow_accepts_request(self, authenticated_client):
         """Test that cancel endpoint accepts request."""
-        with patch("app.platforms.newsletter.router.NewsletterService") as MockService:
-            mock_instance = MockService.return_value
+        with patch("app.platforms.newsletter.routers.workflows.get_newsletter_orchestrator") as MockOrch:
+            mock_instance = MockOrch.return_value
             mock_instance.cancel_workflow = AsyncMock(return_value={
                 "workflow_id": "wf-123",
                 "status": "cancelled",

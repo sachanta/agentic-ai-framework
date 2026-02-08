@@ -2,6 +2,8 @@
 Newsletter Platform API routes.
 
 These routes are registered under /api/v1/platforms/newsletter/
+
+Phase 11: Complete REST API with all routers.
 """
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -16,14 +18,32 @@ from app.platforms.newsletter.schemas import (
 )
 from app.platforms.newsletter.services import NewsletterService
 from app.platforms.newsletter.config import config
-from app.platforms.newsletter.routers import research_router, writing_router, preference_router
+from app.platforms.newsletter.routers import (
+    research_router,
+    writing_router,
+    preference_router,
+    newsletters_router,
+    workflows_router,
+    campaigns_router,
+    subscribers_router,
+    templates_router,
+    analytics_router,
+)
 
 router = APIRouter()
 
-# Include modular routers
+# Include modular routers - Phase 6-8 (Agents)
 router.include_router(research_router)
 router.include_router(writing_router)
 router.include_router(preference_router)
+
+# Include Phase 11 routers (Complete REST API)
+router.include_router(newsletters_router)
+router.include_router(workflows_router)
+router.include_router(campaigns_router)
+router.include_router(subscribers_router)
+router.include_router(templates_router)
+router.include_router(analytics_router)
 
 
 @router.get("/status", response_model=PlatformStatusResponse)
@@ -107,31 +127,34 @@ async def list_agents():
             "id": "research",
             "name": "Research Agent",
             "description": "Content discovery via Tavily search",
-            "status": "active",  # Phase 6 complete
+            "status": "active",
         },
         {
             "id": "writing",
             "name": "Writing Agent",
             "description": "Newsletter content generation",
-            "status": "active",  # Phase 7 complete
+            "status": "active",
         },
         {
             "id": "preference",
             "name": "Preference Agent",
             "description": "User personalization and preference tracking",
-            "status": "active",  # Phase 8 complete
+            "status": "active",
         },
         {
             "id": "custom_prompt",
             "name": "Custom Prompt Agent",
             "description": "NLP processing for natural language queries",
-            "status": "active",  # Phase 8 complete
+            "status": "active",
         },
     ]
 
 
-@router.post("/newsletters/generate", response_model=GenerateNewsletterResponse)
-async def generate_newsletter(
+# Legacy endpoints for backward compatibility
+# These are now also available under /newsletters and /workflows prefixes
+
+@router.post("/generate", response_model=GenerateNewsletterResponse)
+async def generate_newsletter_legacy(
     request: GenerateNewsletterRequest,
     current_user: dict = Depends(get_current_user),
 ):
@@ -140,6 +163,8 @@ async def generate_newsletter(
 
     This initiates the multi-agent workflow with HITL checkpoints.
     Returns a workflow_id to track progress.
+
+    Note: This is a legacy endpoint. Prefer using POST /newsletters/generate.
     """
     service = NewsletterService()
     result = await service.generate_newsletter(
@@ -154,62 +179,3 @@ async def generate_newsletter(
         status=result["status"],
         message=result.get("message", "Newsletter generation started"),
     )
-
-
-@router.get("/workflows/{workflow_id}", response_model=WorkflowStatusResponse)
-async def get_workflow_status(
-    workflow_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """Get the status of a newsletter generation workflow."""
-    service = NewsletterService()
-    result = await service.get_workflow_status(workflow_id)
-
-    if not result:
-        raise HTTPException(status_code=404, detail="Workflow not found")
-
-    return result
-
-
-@router.get("/workflows/{workflow_id}/checkpoint", response_model=CheckpointResponse)
-async def get_pending_checkpoint(
-    workflow_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """Get the current pending checkpoint for a workflow."""
-    service = NewsletterService()
-    result = await service.get_pending_checkpoint(workflow_id)
-
-    if not result:
-        raise HTTPException(status_code=404, detail="No pending checkpoint")
-
-    return result
-
-
-@router.post("/workflows/{workflow_id}/approve")
-async def approve_checkpoint(
-    workflow_id: str,
-    request: ApproveCheckpointRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """Approve, edit, or reject the current checkpoint."""
-    service = NewsletterService()
-    result = await service.approve_checkpoint(
-        workflow_id=workflow_id,
-        checkpoint_id=request.checkpoint_id,
-        action=request.action,
-        modifications=request.modifications,
-        feedback=request.feedback,
-    )
-    return result
-
-
-@router.post("/workflows/{workflow_id}/cancel")
-async def cancel_workflow(
-    workflow_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """Cancel a running workflow."""
-    service = NewsletterService()
-    result = await service.cancel_workflow(workflow_id)
-    return result
