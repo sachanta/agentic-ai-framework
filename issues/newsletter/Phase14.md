@@ -35,7 +35,6 @@ frontend/src/components/apps/newsletter/
 ├── NewsletterPreview.tsx       # Newsletter preview
 ├── GeneratePanel.tsx           # Newsletter generation
 ├── CustomPromptInput.tsx       # Custom prompt UI
-├── MindmapViewer.tsx           # Mermaid mindmap display
 ├── AnalyticsCharts.tsx         # Analytics visualization
 ├── SchedulePanel.tsx           # Scheduling UI
 ├── PreferencesForm.tsx         # User preferences
@@ -102,7 +101,6 @@ Prefs    Research  Review   Write    Send
 - Phase 13 (Types, API, Hooks)
 - React, TypeScript
 - Tailwind CSS (styling)
-- Mermaid (mindmap rendering)
 
 ## Verification
 - [ ] All pages render correctly

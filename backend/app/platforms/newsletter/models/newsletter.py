@@ -52,7 +52,6 @@ class Newsletter(BaseModel):
     # Agent outputs
     research_data: Dict[str, Any] = {}
     writing_data: Dict[str, Any] = {}
-    mindmap_markdown: Optional[str] = None
 
     # Delivery
     sent_to_count: int = 0

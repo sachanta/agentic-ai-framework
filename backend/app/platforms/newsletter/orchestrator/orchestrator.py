@@ -6,11 +6,10 @@ This orchestrator coordinates the newsletter generation workflow:
 2. Process custom prompt if provided (Custom Prompt Agent)
 3. Research content (Research Agent) -> CHECKPOINT 1: Review article selection
 4. Generate newsletter (Writing Agent) -> CHECKPOINT 2: Review content
-5. Generate mindmap (Mindmap Agent)
-6. Create subject lines (Writing Agent) -> CHECKPOINT 3: Review tone & subjects
-7. Format for email (Writing Agent)
-8. Store in database -> CHECKPOINT 4: Final send approval
-9. Send if approved (Email Service)
+5. Create subject lines (Writing Agent) -> CHECKPOINT 3: Review tone & subjects
+6. Format for email (Writing Agent)
+7. Store in database -> CHECKPOINT 4: Final send approval
+8. Send if approved (Email Service)
 """
 from typing import Any, Dict, Optional
 
@@ -39,12 +38,11 @@ class NewsletterOrchestrator(BaseOrchestrator):
 
     def _setup_agents(self):
         """Initialize and register agents."""
-        # Will be implemented in Phase 6-9
+        # Agents are now available (Phases 6-8 complete)
         # self.register_agent(ResearchAgent())
         # self.register_agent(WritingAgent())
         # self.register_agent(PreferenceAgent())
         # self.register_agent(CustomPromptAgent())
-        # self.register_agent(MindmapAgent())
         pass
 
     async def initialize(self):

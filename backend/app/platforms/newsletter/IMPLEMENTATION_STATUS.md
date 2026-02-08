@@ -58,7 +58,7 @@ backend/app/platforms/newsletter/repositories/
 ```
 
 ### Models Implemented
-- **Newsletter**: id, user_id, title, content, html_content, status, workflow_id, topics, tone, research_data, mindmap
+- **Newsletter**: id, user_id, title, content, html_content, status, workflow_id, topics, tone, research_data
 - **Subscriber**: id, user_id, email, name, status, preferences, engagement, tags
 - **Campaign**: id, user_id, name, subject, status, targeting, scheduling, analytics
 - **Template**: id, user_id, name, category, html_content, variables, styles
@@ -175,22 +175,21 @@ cd /home/sachanta/wd/repos/agentic-ai-framework/backend
 
 ---
 
-## 15 Phases Overview
+## 14 Phases Overview
 
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 1 | Platform Scaffolding | ✅ Complete |
 | 2 | MongoDB Models & Repositories | ✅ Complete |
-| 3 | Tavily Search Service | ✅ Complete (226 tests) |
-| 4 | RAG System (Weaviate) | Pending |
-| 5 | Memory Service (MongoDB) | Pending |
-| 6 | Research Agent | Pending |
-| 7 | Writing Agent | Pending |
-| 8 | Preference & Custom Prompt Agents | Pending |
-| 9 | Mindmap Agent | Pending |
-| 10 | LangGraph Orchestrator with HITL | Pending |
-| 11 | Email Service (Resend) | Pending |
-| 12 | Full API Endpoints | Pending |
-| 13 | Frontend Types, API, Hooks | Pending |
-| 14 | Frontend Pages & Components | Pending |
-| 15 | Scheduling & Background Jobs | Pending |
+| 3 | Tavily Search Service | ✅ Complete |
+| 4 | RAG System (Weaviate) | ✅ Complete |
+| 5 | Memory Service (MongoDB) | ✅ Complete |
+| 6 | Research Agent | ✅ Complete |
+| 7 | Writing Agent | ✅ Complete |
+| 8 | Preference & Custom Prompt Agents | ✅ Complete |
+| 9 | LangGraph Orchestrator with HITL | Pending |
+| 10 | Email Service (Resend) | Pending |
+| 11 | Full API Endpoints | Pending |
+| 12 | Frontend Types, API, Hooks | Pending |
+| 13 | Frontend Pages & Components | Pending |
+| 14 | Scheduling & Background Jobs | Pending |

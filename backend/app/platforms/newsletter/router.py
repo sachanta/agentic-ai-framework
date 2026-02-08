@@ -33,7 +33,7 @@ async def get_platform_status():
         platform_id="newsletter",
         name="Newsletter",
         status="active" if config.ENABLED else "disabled",
-        agents=["research", "writing", "preference", "custom_prompt", "mindmap"],
+        agents=["research", "writing", "preference", "custom_prompt"],
         version="1.0.0",
         llm_provider=config.effective_provider,
         llm_model=config.effective_model,
@@ -127,12 +127,6 @@ async def list_agents():
             "description": "NLP processing for natural language queries",
             "status": "active",  # Phase 8 complete
         },
-        {
-            "id": "mindmap",
-            "name": "Mindmap Agent",
-            "description": "Visual knowledge map generation",
-            "status": "pending",  # Will be "active" after Phase 9
-        },
     ]
 
 
@@ -154,7 +148,6 @@ async def generate_newsletter(
         tone=request.tone.value,
         max_articles=request.max_articles,
         custom_prompt=request.custom_prompt,
-        include_mindmap=request.include_mindmap,
     )
     return GenerateNewsletterResponse(
         workflow_id=result["workflow_id"],

@@ -42,13 +42,11 @@ class GenerateNewsletterRequest(BaseModel):
     tone: Tone = Tone.PROFESSIONAL
     max_articles: int = 10
     custom_prompt: Optional[str] = None
-    include_mindmap: bool = True
 
 
 class CustomPromptRequest(BaseModel):
     """Request schema for custom prompt newsletter generation."""
     prompt: str
-    include_mindmap: bool = True
 
 
 # Response schemas
@@ -71,7 +69,6 @@ class NewsletterResponse(BaseModel):
     tone: Tone
     word_count: int = 0
     read_time_minutes: int = 0
-    mindmap_markdown: Optional[str] = None
     created_at: datetime
     sent_at: Optional[datetime] = None
 

@@ -23,7 +23,6 @@ class SubscriberPreferences(BaseModel):
     topics: List[str] = []
     tone: str = "professional"
     frequency: str = "weekly"  # daily, weekly, monthly
-    include_mindmap: bool = True
     custom_prompt: Optional[str] = None
 
 

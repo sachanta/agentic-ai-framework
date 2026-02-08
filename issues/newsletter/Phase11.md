@@ -14,7 +14,6 @@ backend/app/platforms/newsletter/services/email.py
 ## Features
 - Send newsletter emails with Resend
 - HTML and plain text versions
-- Mindmap SVG embedding
 - Retry mechanism (3 retries)
 - Delivery tracking
 - Test email support
@@ -34,16 +33,14 @@ The Email Service is the **final delivery mechanism** for newsletters:
 ### The Flow
 1. Newsletter approved at Checkpoint 4
 2. Email Service formats content for delivery
-3. Embeds mindmap SVG if generated
-4. Sends to all campaign recipients
-5. Tracks delivery status and updates analytics
+3. Sends to all campaign recipients
+4. Tracks delivery status and updates analytics
 
 ### Key Capabilities
 
 | Capability | Description |
 |------------|-------------|
 | Multi-format | Sends both HTML and plain text versions |
-| SVG embedding | Includes mindmap visualization inline |
 | Retry logic | Retries failed sends up to 3 times |
 | Tracking | Records delivered/bounced/opened status |
 | Test mode | Send test email before full campaign |

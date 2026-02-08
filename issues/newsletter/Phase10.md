@@ -47,8 +47,7 @@ backend/app/platforms/newsletter/orchestrator/
 │            │   [Approve/Edit/Reject] │                          │
 │            └────────────┬────────────┘                          │
 │                         │                                        │
-│  5. Generate mindmap (Mindmap Agent)                            │
-│  6. Create subject lines (Writing Agent)                        │
+│  5. Create subject lines (Writing Agent)                        │
 │                         │                                        │
 │            ┌────────────▼────────────┐                          │
 │            │   🛑 CHECKPOINT 3       │                          │
@@ -57,9 +56,9 @@ backend/app/platforms/newsletter/orchestrator/
 │            │   [Approve/Edit/Reject] │                          │
 │            └────────────┬────────────┘                          │
 │                         │                                        │
-│  7. Format for email (Writing Agent)                            │
-│  8. Store in database (MongoDB)                                 │
-│  9. Store in vector DB (Weaviate RAG)                          │
+│  6. Format for email (Writing Agent)                            │
+│  7. Store in database (MongoDB)                                 │
+│  8. Store in vector DB (Weaviate RAG)                          │
 │                         │                                        │
 │            ┌────────────▼────────────┐                          │
 │            │   🛑 CHECKPOINT 4       │                          │
@@ -68,7 +67,7 @@ backend/app/platforms/newsletter/orchestrator/
 │            │   [Send/Schedule/Cancel]│                          │
 │            └────────────┬────────────┘                          │
 │                         │                                        │
-│  10. Send if approved (Email Service)                           │
+│  9. Send if approved (Email Service)                            │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
