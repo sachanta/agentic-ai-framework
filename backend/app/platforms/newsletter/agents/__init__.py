@@ -9,7 +9,13 @@ Agents:
 - MindmapAgent: Visual knowledge maps (Phase 9)
 """
 from app.platforms.newsletter.agents.research import ResearchAgent
+from app.platforms.newsletter.agents.writing import WritingAgent
+from app.platforms.newsletter.agents.preference import PreferenceAgent
+from app.platforms.newsletter.agents.custom_prompt import CustomPromptAgent
 
 __all__ = [
     "ResearchAgent",
+    "WritingAgent",
+    "PreferenceAgent",
+    "CustomPromptAgent",
 ]

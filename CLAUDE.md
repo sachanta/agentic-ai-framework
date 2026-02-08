@@ -111,8 +111,12 @@ agents/{agent_name}/
 - Phase 3: Tavily Search Service ✅
 - Phase 4: RAG System (Weaviate) ✅
 - Phase 5: Memory Service (MongoDB TTL) ✅
-- Phase 6: Research Agent ✅
-- Phase 7-15: Pending
+- Phase 6: Research Agent ✅ (84 tests)
+- Phase 7: Writing Agent ✅ (84 tests)
+- **Phase 8: Preference & Custom Prompt Agents** ← Next
+- Phase 9: Mindmap Agent
+- Phase 10: Newsletter Orchestrator with HITL
+- Phase 11-15: Email, Testing, Deployment
 
 ### Key Services
 
@@ -122,6 +126,7 @@ agents/{agent_name}/
 | NewsletterRAGService | `services/rag.py` | Vector storage in Weaviate |
 | MemoryService | `services/memory.py` | MongoDB cache with TTL |
 | ResearchAgent | `agents/research/` | Content discovery pipeline |
+| WritingAgent | `agents/writing/` | Newsletter content generation |
 
 ### Config Pattern
 

@@ -7,6 +7,8 @@ import type {
   ResearchRequest,
   CustomResearchRequest,
   ResearchResponse,
+  GenerateRequest,
+  GenerateResponse,
 } from '@/types/newsletter';
 
 // Query keys
@@ -66,5 +68,14 @@ export function useTrending(topics: string[], maxResults: number = 10) {
     queryFn: () => newsletterApi.getTrending(topics, maxResults),
     enabled: topics.length > 0,
     staleTime: 60000, // 1 minute
+  });
+}
+
+/**
+ * Hook to generate newsletter from selected articles
+ */
+export function useGenerateNewsletter() {
+  return useMutation<GenerateResponse, Error, GenerateRequest>({
+    mutationFn: newsletterApi.generate,
   });
 }

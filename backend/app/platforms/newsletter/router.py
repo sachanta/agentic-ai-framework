@@ -16,12 +16,14 @@ from app.platforms.newsletter.schemas import (
 )
 from app.platforms.newsletter.services import NewsletterService
 from app.platforms.newsletter.config import config
-from app.platforms.newsletter.routers import research_router
+from app.platforms.newsletter.routers import research_router, writing_router, preference_router
 
 router = APIRouter()
 
 # Include modular routers
 router.include_router(research_router)
+router.include_router(writing_router)
+router.include_router(preference_router)
 
 
 @router.get("/status", response_model=PlatformStatusResponse)
@@ -105,25 +107,25 @@ async def list_agents():
             "id": "research",
             "name": "Research Agent",
             "description": "Content discovery via Tavily search",
-            "status": "pending",  # Will be "active" after Phase 6
+            "status": "active",  # Phase 6 complete
         },
         {
             "id": "writing",
             "name": "Writing Agent",
             "description": "Newsletter content generation",
-            "status": "pending",  # Will be "active" after Phase 7
+            "status": "active",  # Phase 7 complete
         },
         {
             "id": "preference",
             "name": "Preference Agent",
             "description": "User personalization and preference tracking",
-            "status": "pending",  # Will be "active" after Phase 8
+            "status": "active",  # Phase 8 complete
         },
         {
             "id": "custom_prompt",
             "name": "Custom Prompt Agent",
             "description": "NLP processing for natural language queries",
-            "status": "pending",  # Will be "active" after Phase 8
+            "status": "active",  # Phase 8 complete
         },
         {
             "id": "mindmap",

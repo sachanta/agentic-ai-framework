@@ -16,6 +16,8 @@ import type {
   ResearchResponse,
   NewsletterStatus,
   NewsletterAgent,
+  GenerateRequest,
+  GenerateResponse,
 } from '@/types/newsletter';
 
 const BASE_PATH = '/api/v1/platforms';
@@ -168,6 +170,18 @@ export const newsletterApi = {
         },
         timeout: RESEARCH_TIMEOUT,
       }
+    );
+    return response.data;
+  },
+
+  /**
+   * Generate newsletter from selected articles
+   */
+  generate: async (request: GenerateRequest): Promise<GenerateResponse> => {
+    const response = await apiClient.post<GenerateResponse>(
+      `${BASE_PATH}/newsletter/writing/generate`,
+      request,
+      { timeout: 300000 } // 5 minute timeout for generation
     );
     return response.data;
   },

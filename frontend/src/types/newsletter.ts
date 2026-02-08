@@ -63,3 +63,52 @@ export interface NewsletterAgent {
   description: string;
   status: string;
 }
+
+// Writing request/response types (Phase 7)
+export interface GenerateRequest {
+  articles: Article[];
+  tone: string;
+  user_id?: string;
+  include_rag?: boolean;
+}
+
+export interface SubjectLine {
+  text: string;
+  style: string;
+}
+
+export interface NewsletterContent {
+  content: string;
+  word_count: number;
+}
+
+export interface NewsletterFormats {
+  html: string;
+  text: string;
+  markdown: string;
+}
+
+export interface NewsletterSummary {
+  bullets: string[];
+  raw?: string;
+}
+
+export interface GenerateMetadata {
+  article_count: number;
+  topics: string[];
+  tone: string;
+  generated_at: string;
+  rag_examples_used?: number;
+}
+
+export interface GenerateResponse {
+  success: boolean;
+  newsletter?: NewsletterContent;
+  subject_lines: SubjectLine[];
+  summary?: NewsletterSummary;
+  formats?: NewsletterFormats;
+  metadata?: GenerateMetadata;
+  error?: string;
+}
+
+export type WritingTone = 'professional' | 'casual' | 'formal' | 'enthusiastic';

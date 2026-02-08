@@ -1,7 +1,7 @@
 # Phase 8: Preference & Custom Prompt Agents
 
 ## Goal
-User preference and NLP processing agents
+User preference and NLP processing agents for personalization
 
 ## Status
 - [ ] Not Started
@@ -9,40 +9,45 @@ User preference and NLP processing agents
 ## Files to Create
 ```
 backend/app/platforms/newsletter/agents/preference/
+├── __init__.py
 ├── agent.py           # PreferenceAgent
-├── chain.py
-└── prompts/
+├── llm.py             # get_preference_llm()
+├── prompts.py         # Preference analysis prompts
+└── schemas.py         # UserPreferences, PreferenceUpdate
 
 backend/app/platforms/newsletter/agents/custom_prompt/
+├── __init__.py
 ├── agent.py           # CustomPromptAgent
-├── chain.py
-└── prompts/
+├── llm.py             # get_custom_prompt_llm()
+├── prompts.py         # NLP extraction prompts
+└── schemas.py         # PromptAnalysis, ExtractedParameters
+
+backend/app/platforms/newsletter/routers/
+└── preferences.py     # Preference API endpoints
+
+backend/app/platforms/newsletter/tests/phase8/
+├── test_preference_agent.py
+├── test_preference_llm.py
+├── test_preference_prompts.py
+├── test_custom_prompt_agent.py
+├── test_custom_prompt_llm.py
+└── test_custom_prompt_prompts.py
 ```
 
 ## Preference Agent Tasks
-- `update_preferences()`: Store user preferences
-- `get_preferences()`: Retrieve with fallback
+- `get_preferences()`: Retrieve user preferences with defaults
+- `update_preferences()`: Update specific preference fields
 - `analyze_preferences()`: Behavior pattern analysis
 - `recommend_preferences()`: Suggestions based on engagement
+- `learn_from_engagement()`: Update based on signals
 
 ## Custom Prompt Agent Tasks
-- `process_prompt()`: Full NLP pipeline
-- `analyze_prompt()`: Extract intent/parameters
-- `enhance_prompt()`: Add user context
-- `generate_parameters()`: Research/writing params
+- `analyze_prompt()`: Extract intent and parameters from NL
+- `enhance_prompt()`: Add user context to prompt
+- `generate_parameters()`: Convert to research/writing params
+- `validate_parameters()`: Validate extracted parameters
 
-## How It Helps The Project
-
-These two agents handle **personalization** at the start of each newsletter generation:
-
-### Preference Agent
-Manages user preferences and learns from behavior:
-- Stores topic interests, tone preferences, frequency
-- Analyzes which preferences lead to high engagement
-- Recommends preference changes based on patterns
-
-### Custom Prompt Agent
-Processes natural language requests into structured parameters:
+## Example Transformation
 ```
 Input:  "Write about AI in healthcare, keep it short and professional"
 Output: {
@@ -53,17 +58,51 @@ Output: {
 }
 ```
 
+## How It Helps The Project
+
+These agents handle **personalization** at the start of each newsletter generation:
+
 ### The Flow
-1. Preference Agent loads user preferences
-2. If custom prompt provided, Custom Prompt Agent extracts parameters
-3. Combined parameters go to Research Agent (Phase 6)
+```
+User Request
+    │
+    ├─→ Preference Agent → Load user preferences
+    │                          │
+    ├─→ Custom Prompt Agent → Extract parameters (if prompt provided)
+    │                          │
+    └──────────┬───────────────┘
+               ▼
+       Combined Parameters
+               │
+               ▼
+       Research Agent (Phase 6)
+               │
+               ▼
+       Writing Agent (Phase 7)
+```
+
+### Key Features
+
+| Agent | Feature | Description |
+|-------|---------|-------------|
+| Preference | Storage | MongoDB-backed preference persistence |
+| Preference | Learning | Updates preferences from engagement |
+| Preference | Recommendations | AI-powered preference suggestions |
+| Custom Prompt | NLP | Extracts topics, tone, constraints |
+| Custom Prompt | Context | Merges with user preferences |
+| Custom Prompt | Validation | Ensures valid parameters |
 
 ## Dependencies
 - Phase 5 (Memory Service)
+- Phase 6 (Research Agent)
+- Phase 7 (Writing Agent)
 - Framework BaseAgent
 
 ## Verification
 - [ ] Preference Agent stores/retrieves preferences
-- [ ] Custom Prompt Agent extracts parameters correctly
-- [ ] NLP handles various prompt styles
-- [ ] Tests passing
+- [ ] Preference Agent recommends based on engagement
+- [ ] Custom Prompt Agent extracts topics correctly
+- [ ] Custom Prompt Agent detects tone
+- [ ] Parameters merge with user preferences
+- [ ] API endpoints work
+- [ ] Tests passing (~64 tests)

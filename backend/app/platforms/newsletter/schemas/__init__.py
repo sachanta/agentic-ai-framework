@@ -133,6 +133,28 @@ from app.platforms.newsletter.schemas.research import (
     ResearchResponse,
 )
 
+from app.platforms.newsletter.schemas.writing import (
+    GenerateRequest,
+    SubjectLine,
+    NewsletterContent,
+    NewsletterFormats,
+    NewsletterSummary,
+    GenerateMetadata,
+    GenerateResponse,
+    RegenerateRequest,
+)
+
+from app.platforms.newsletter.schemas.preference import (
+    PreferenceResponse,
+    PreferenceUpdateRequest,
+    EngagementRequest,
+    InsightResponse,
+    AnalysisResponse,
+    RecommendationResponse,
+    RecommendationsListResponse,
+    PreferenceActionResponse,
+)
+
 __all__ = [
     "NewsletterStatus",
     "Tone",
@@ -153,4 +175,22 @@ __all__ = [
     "ArticleResponse",
     "ResearchMetadata",
     "ResearchResponse",
+    # Writing schemas (Phase 7)
+    "GenerateRequest",
+    "SubjectLine",
+    "NewsletterContent",
+    "NewsletterFormats",
+    "NewsletterSummary",
+    "GenerateMetadata",
+    "GenerateResponse",
+    "RegenerateRequest",
+    # Preference schemas (Phase 8)
+    "PreferenceResponse",
+    "PreferenceUpdateRequest",
+    "EngagementRequest",
+    "InsightResponse",
+    "AnalysisResponse",
+    "RecommendationResponse",
+    "RecommendationsListResponse",
+    "PreferenceActionResponse",
 ]
