@@ -37,7 +37,6 @@ class NewsletterService:
         tone: str = "professional",
         max_articles: int = 10,
         custom_prompt: Optional[str] = None,
-        include_mindmap: bool = True,
     ) -> Dict[str, Any]:
         """
         Start newsletter generation workflow.
@@ -48,7 +47,6 @@ class NewsletterService:
             tone: Newsletter tone
             max_articles: Maximum number of articles
             custom_prompt: Optional custom prompt
-            include_mindmap: Whether to generate a mindmap
 
         Returns:
             Dictionary with workflow_id and status
@@ -59,7 +57,6 @@ class NewsletterService:
             "tone": tone,
             "max_articles": max_articles,
             "custom_prompt": custom_prompt,
-            "include_mindmap": include_mindmap,
         })
         return result
 
@@ -145,6 +142,15 @@ from app.platforms.newsletter.services.memory import (
     CACHE_COLLECTION,
 )
 
+from app.platforms.newsletter.services.email import (
+    EmailService,
+    EmailResult,
+    EmailBatch,
+    EmailStatus,
+    EmailType,
+    get_email_service,
+)
+
 __all__ = [
     "NewsletterService",
     "TavilySearchService",
@@ -157,4 +163,10 @@ __all__ = [
     "get_memory_service",
     "CacheType",
     "CACHE_COLLECTION",
+    "EmailService",
+    "EmailResult",
+    "EmailBatch",
+    "EmailStatus",
+    "EmailType",
+    "get_email_service",
 ]
