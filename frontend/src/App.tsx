@@ -14,6 +14,14 @@ import AppsPage from '@/pages/AppsPage';
 import AppDetailPage from '@/pages/AppDetailPage';
 import HelloWorldPage from '@/pages/apps/HelloWorldPage';
 import NewsletterPage from '@/pages/apps/NewsletterPage';
+import {
+  CampaignsPage,
+  CampaignDetailPage,
+  SubscribersPage,
+  TemplatesPage,
+  AnalyticsPage,
+  WorkflowPage,
+} from '@/pages/newsletter';
 import AgentsPage from '@/pages/AgentsPage';
 import AgentDetailPage from '@/pages/AgentDetailPage';
 import ToolsPage from '@/pages/ToolsPage';
@@ -62,6 +70,12 @@ function App() {
               <Route path={ROUTES.APPS} element={<AppsPage />} />
               <Route path={ROUTES.HELLO_WORLD_APP} element={<HelloWorldPage />} />
               <Route path={ROUTES.NEWSLETTER_APP} element={<NewsletterPage />} />
+              <Route path={ROUTES.NEWSLETTER_CAMPAIGNS} element={<CampaignsPage />} />
+              <Route path={ROUTES.NEWSLETTER_CAMPAIGN_DETAIL} element={<CampaignDetailPage />} />
+              <Route path={ROUTES.NEWSLETTER_SUBSCRIBERS} element={<SubscribersPage />} />
+              <Route path={ROUTES.NEWSLETTER_TEMPLATES} element={<TemplatesPage />} />
+              <Route path={ROUTES.NEWSLETTER_ANALYTICS} element={<AnalyticsPage />} />
+              <Route path={ROUTES.NEWSLETTER_WORKFLOW} element={<WorkflowPage />} />
               <Route path={ROUTES.APP_DETAIL} element={<AppDetailPage />} />
               <Route path={ROUTES.AGENTS} element={<AgentsPage />} />
               <Route path="/agents/:id" element={<AgentDetailPage />} />

@@ -1,94 +1,285 @@
 /**
  * Main Newsletter app component
+ *
+ * Integrates dashboard, generation panel, and HITL workflow UI
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/components/ui/use-toast';
 import { AppStatusBadge } from '../AppStatusBadge';
+import { NewsletterDashboard } from './NewsletterDashboard';
+import { GeneratePanel } from './GeneratePanel';
 import { ResearchPanel } from './ResearchPanel';
 import { ArticleResults } from './ArticleResults';
 import { WritingPanel } from './WritingPanel';
 import { NewsletterPreview } from './NewsletterPreview';
 import {
+  WorkflowTracker,
+  ArticleReview,
+  ContentReview,
+  FinalApproval,
+  WorkflowHistory,
+} from './workflow';
+import {
   useNewsletterStatus,
   useNewsletterAgents,
   useResearch,
   useResearchCustom,
-  useGenerateNewsletter,
+  useGenerateContent,
+  useGenerateWorkflow,
+  useWorkflow,
+  useWorkflowCheckpoint,
+  useWorkflowHistory,
+  useApproveCheckpoint,
+  useRejectCheckpoint,
+  useCancelWorkflow,
 } from '@/hooks/useNewsletter';
-import { ArrowLeft, Newspaper, Bot, Info } from 'lucide-react';
-import type { Article, ResearchResponse, GenerateResponse, WritingTone } from '@/types/newsletter';
+import { useWorkflowSSE } from '@/hooks/useWorkflowSSE';
+import { useWorkflowState, useArticleSelection } from '@/store/newsletterStore';
+import {
+  ArrowLeft,
+  Newspaper,
+  Bot,
+  Info,
+  LayoutDashboard,
+  Wand2,
+  FileText,
+  X,
+} from 'lucide-react';
+import type { Article, ResearchResponse, GenerateResponse, WritingTone, CheckpointAction } from '@/types/newsletter';
 
-type AppPhase = 'research' | 'writing' | 'preview';
+type AppView = 'dashboard' | 'generate' | 'manual' | 'workflow';
+type ManualPhase = 'research' | 'writing' | 'preview';
 
 export function NewsletterApp() {
-  // Phase management
-  const [phase, setPhase] = useState<AppPhase>('research');
+  const { toast } = useToast();
 
-  // Research state
+  // View management
+  const [view, setView] = useState<AppView>('dashboard');
+  const [manualPhase, setManualPhase] = useState<ManualPhase>('research');
+
+  // Workflow state from store
+  const {
+    activeWorkflowId,
+    setActiveWorkflow,
+    setWorkflowStatus,
+    setCheckpointData,
+    clearWorkflowState,
+  } = useWorkflowState();
+
+  // Article selection from store
+  const { selectedArticles, setSelectedArticles, clearSelectedArticles } = useArticleSelection();
+
+  // Manual mode state
   const [researchResult, setResearchResult] = useState<ResearchResponse | null>(null);
-  const [selectedArticles, setSelectedArticles] = useState<Article[]>([]);
-
-  // Writing state
   const [tone, setTone] = useState<WritingTone>('professional');
   const [generatedNewsletter, setGeneratedNewsletter] = useState<GenerateResponse | null>(null);
+
+  // Loading action tracking
+  const [loadingAction, setLoadingAction] = useState<CheckpointAction | null>(null);
 
   // Queries and mutations
   const { data: status } = useNewsletterStatus();
   const { data: agents } = useNewsletterAgents();
+
+  // Manual mode mutations
   const researchMutation = useResearch();
   const researchCustomMutation = useResearchCustom();
-  const generateMutation = useGenerateNewsletter();
+  const generateContentMutation = useGenerateContent();
+
+  // Workflow mutations
+  const generateWorkflowMutation = useGenerateWorkflow();
+  const approveMutation = useApproveCheckpoint();
+  const rejectMutation = useRejectCheckpoint();
+  const cancelMutation = useCancelWorkflow();
+
+  // Workflow queries (only when workflow is active)
+  const { data: workflowData } = useWorkflow(activeWorkflowId || '');
+  const { data: checkpoint } = useWorkflowCheckpoint(activeWorkflowId || '');
+  const { data: history } = useWorkflowHistory(activeWorkflowId || '');
+
+  // SSE connection for real-time updates
+  useWorkflowSSE(activeWorkflowId, {
+    onStatus: (event) => {
+      setWorkflowStatus(event.status);
+    },
+    onCheckpoint: (event) => {
+      setCheckpointData(event);
+      toast({
+        title: 'Checkpoint Ready',
+        description: `${event.title} - Your review is needed`,
+      });
+    },
+    onComplete: (event) => {
+      if (event.status === 'completed') {
+        toast({
+          title: 'Newsletter Complete!',
+          description: 'Your newsletter has been generated successfully.',
+        });
+      }
+      setView('dashboard');
+      clearWorkflowState();
+    },
+    onError: (event) => {
+      toast({
+        title: 'Workflow Error',
+        description: event.error,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Update workflow status when data changes
+  useEffect(() => {
+    if (workflowData) {
+      setWorkflowStatus(workflowData.status);
+    }
+  }, [workflowData, setWorkflowStatus]);
 
   const isResearching = researchMutation.isPending || researchCustomMutation.isPending;
-  const isGenerating = generateMutation.isPending;
-  const researchError = researchMutation.error?.message || researchCustomMutation.error?.message || researchResult?.error;
+  const isGenerating = generateContentMutation.isPending;
+  const isWorkflowLoading = generateWorkflowMutation.isPending || approveMutation.isPending || rejectMutation.isPending;
 
-  // Research handlers
+  // ============================================================================
+  // WORKFLOW MODE HANDLERS
+  // ============================================================================
+
+  const handleStartWorkflow = (options: {
+    topics: string[];
+    tone: string;
+    maxArticles: number;
+    customPrompt?: string;
+    includeRag: boolean;
+  }) => {
+    generateWorkflowMutation.mutate(
+      {
+        topics: options.topics,
+        tone: options.tone,
+        max_articles: options.maxArticles,
+        include_rag: options.includeRag,
+      },
+      {
+        onSuccess: (data) => {
+          setActiveWorkflow(data.workflow_id);
+          setView('workflow');
+          toast({
+            title: 'Workflow Started',
+            description: 'Newsletter generation is in progress...',
+          });
+        },
+        onError: (error) => {
+          toast({
+            title: 'Failed to Start',
+            description: error.message,
+            variant: 'destructive',
+          });
+        },
+      }
+    );
+  };
+
+  const handleApproveCheckpoint = (data?: Record<string, unknown>, feedback?: string) => {
+    if (!activeWorkflowId || !checkpoint) return;
+
+    setLoadingAction('approve');
+    approveMutation.mutate(
+      {
+        workflowId: activeWorkflowId,
+        request: {
+          checkpoint_id: checkpoint.checkpoint_id,
+          action: 'approve',
+          modifications: data,
+          feedback,
+        },
+      },
+      {
+        onSuccess: () => {
+          setLoadingAction(null);
+        },
+        onError: (error) => {
+          setLoadingAction(null);
+          toast({
+            title: 'Approval Failed',
+            description: error.message,
+            variant: 'destructive',
+          });
+        },
+      }
+    );
+  };
+
+  const handleRejectCheckpoint = (feedback?: string) => {
+    if (!activeWorkflowId || !checkpoint) return;
+
+    setLoadingAction('reject');
+    rejectMutation.mutate(
+      {
+        workflowId: activeWorkflowId,
+        request: {
+          checkpoint_id: checkpoint.checkpoint_id,
+          feedback,
+        },
+      },
+      {
+        onSuccess: () => {
+          setLoadingAction(null);
+        },
+        onError: (error) => {
+          setLoadingAction(null);
+          toast({
+            title: 'Rejection Failed',
+            description: error.message,
+            variant: 'destructive',
+          });
+        },
+      }
+    );
+  };
+
+  const handleCancelWorkflow = () => {
+    if (!activeWorkflowId) return;
+
+    cancelMutation.mutate(activeWorkflowId, {
+      onSuccess: () => {
+        clearWorkflowState();
+        setView('dashboard');
+        toast({
+          title: 'Workflow Cancelled',
+          description: 'The newsletter generation has been cancelled.',
+        });
+      },
+    });
+  };
+
+  // ============================================================================
+  // MANUAL MODE HANDLERS
+  // ============================================================================
+
   const handleResearch = (
     topics: string[],
     customPrompt: string | null,
     maxResults: number,
     includeSummaries: boolean
   ) => {
-    // Reset state for new research
     setResearchResult(null);
-    setSelectedArticles([]);
+    clearSelectedArticles();
     setGeneratedNewsletter(null);
-    setPhase('research');
+    setManualPhase('research');
 
-    if (customPrompt) {
-      researchCustomMutation.mutate(
-        {
-          prompt: customPrompt,
-          max_results: maxResults,
-          include_summaries: includeSummaries,
-        },
-        {
-          onSuccess: (data) => {
-            setResearchResult(data);
-          },
-        }
-      );
-    } else {
-      researchMutation.mutate(
-        {
-          topics,
-          max_results: maxResults,
-          include_summaries: includeSummaries,
-        },
-        {
-          onSuccess: (data) => {
-            setResearchResult(data);
-          },
-        }
-      );
-    }
+    const mutation = customPrompt ? researchCustomMutation : researchMutation;
+    const request = customPrompt
+      ? { prompt: customPrompt, max_results: maxResults, include_summaries: includeSummaries }
+      : { topics, max_results: maxResults, include_summaries: includeSummaries };
+
+    mutation.mutate(request as any, {
+      onSuccess: (data) => setResearchResult(data),
+    });
   };
 
-  // Article selection handlers
   const handleArticleSelect = (article: Article, selected: boolean) => {
     if (selected) {
       setSelectedArticles([...selectedArticles, article]);
@@ -97,19 +288,8 @@ export function NewsletterApp() {
     }
   };
 
-  const handleSelectAll = () => {
-    if (researchResult?.articles) {
-      setSelectedArticles([...researchResult.articles]);
-    }
-  };
-
-  const handleClearSelection = () => {
-    setSelectedArticles([]);
-  };
-
-  // Generate handlers
   const handleGenerate = () => {
-    generateMutation.mutate(
+    generateContentMutation.mutate(
       {
         articles: selectedArticles,
         tone,
@@ -119,22 +299,89 @@ export function NewsletterApp() {
         onSuccess: (data) => {
           setGeneratedNewsletter(data);
           if (data.success) {
-            setPhase('preview');
+            setManualPhase('preview');
           }
         },
       }
     );
   };
 
-  const handleRegenerate = () => {
-    handleGenerate();
+  // ============================================================================
+  // RENDER HELPERS
+  // ============================================================================
+
+  const renderCheckpointUI = () => {
+    if (!checkpoint || !workflowData) return null;
+
+    const checkpointType = checkpoint.checkpoint_type;
+    const checkpointData = checkpoint.data;
+
+    switch (checkpointType) {
+      case 'research_review':
+        return (
+          <ArticleReview
+            checkpoint={checkpoint}
+            articles={(checkpointData.articles as Article[]) || []}
+            onApprove={(articles, feedback) => {
+              handleApproveCheckpoint({ articles }, feedback);
+            }}
+            onReject={handleRejectCheckpoint}
+            isLoading={isWorkflowLoading}
+            loadingAction={loadingAction}
+          />
+        );
+
+      case 'content_review':
+        return (
+          <ContentReview
+            checkpoint={checkpoint}
+            content={checkpointData.newsletter as any || { content: '', word_count: 0 }}
+            formats={checkpointData.formats as any}
+            onApprove={(content, feedback) => {
+              handleApproveCheckpoint({ content }, feedback);
+            }}
+            onEdit={(content, feedback) => {
+              handleApproveCheckpoint({ content, action: 'edit' }, feedback);
+            }}
+            onReject={handleRejectCheckpoint}
+            isLoading={isWorkflowLoading}
+            loadingAction={loadingAction}
+          />
+        );
+
+      case 'final_review':
+        return (
+          <FinalApproval
+            checkpoint={checkpoint}
+            subject={String(checkpointData.subject || '')}
+            content={String(checkpointData.content || '')}
+            formats={checkpointData.formats as any}
+            articleCount={workflowData.article_count}
+            onApprove={(scheduleAt, feedback) => {
+              handleApproveCheckpoint({ schedule_at: scheduleAt }, feedback);
+            }}
+            onReject={handleRejectCheckpoint}
+            isLoading={isWorkflowLoading}
+            loadingAction={loadingAction}
+          />
+        );
+
+      default:
+        return (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <p className="text-muted-foreground">
+                Unknown checkpoint type: {checkpointType}
+              </p>
+            </CardContent>
+          </Card>
+        );
+    }
   };
 
-  // Reset to research phase
-  const handleBackToResearch = () => {
-    setPhase('research');
-    setGeneratedNewsletter(null);
-  };
+  // ============================================================================
+  // RENDER
+  // ============================================================================
 
   return (
     <div className="space-y-6">
@@ -151,162 +398,265 @@ export function NewsletterApp() {
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">
-                {phase === 'preview' ? 'Newsletter Preview' : 'Newsletter Research'}
-              </h1>
+              <h1 className="text-2xl font-bold">Newsletter</h1>
               {status && <AppStatusBadge status={status.status} />}
             </div>
             <p className="text-muted-foreground">
-              {phase === 'preview'
-                ? 'Review and customize your generated newsletter'
-                : 'Discover content for your newsletter using AI-powered research'}
+              AI-powered newsletter generation with human-in-the-loop
             </p>
           </div>
-          {phase === 'preview' && (
-            <Button variant="outline" onClick={handleBackToResearch}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Research
+
+          {/* Cancel workflow button */}
+          {view === 'workflow' && activeWorkflowId && (
+            <Button
+              variant="outline"
+              onClick={handleCancelWorkflow}
+              disabled={cancelMutation.isPending}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Cancel Workflow
             </Button>
           )}
         </div>
       </div>
 
-      {/* Preview Phase */}
-      {phase === 'preview' && generatedNewsletter && (
-        <NewsletterPreview
-          result={generatedNewsletter}
-          onRegenerate={handleRegenerate}
-          isRegenerating={isGenerating}
-        />
-      )}
+      {/* Workflow view */}
+      {view === 'workflow' && activeWorkflowId && (
+        <div className="space-y-6">
+          {/* Workflow tracker */}
+          <Card>
+            <CardContent className="pt-6">
+              <WorkflowTracker
+                currentStep={workflowData?.current_step || null}
+                completedSteps={workflowData?.checkpoints_completed || []}
+                status={workflowData?.status || null}
+              />
+            </CardContent>
+          </Card>
 
-      {/* Research/Writing Phase */}
-      {phase !== 'preview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main content - Panel and Results */}
-          <div className="lg:col-span-2 space-y-6">
-            <ResearchPanel onResearch={handleResearch} isLoading={isResearching} />
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* Checkpoint UI */}
+            <div className="lg:col-span-2">
+              {workflowData?.status === 'awaiting_approval' && checkpoint ? (
+                renderCheckpointUI()
+              ) : workflowData?.status === 'running' ? (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <div className="animate-pulse">
+                      <Wand2 className="h-12 w-12 mx-auto text-primary mb-4" />
+                      <p className="text-lg font-medium">Processing...</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {workflowData?.current_step?.replace(/_/g, ' ') || 'Starting workflow'}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="py-8 text-center text-muted-foreground">
+                    Workflow status: {workflowData?.status || 'Loading...'}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
 
-            {/* Writing Panel - shows when articles are selected */}
-            <WritingPanel
-              selectedArticles={selectedArticles}
-              tone={tone}
-              onToneChange={setTone}
-              onGenerate={handleGenerate}
-              onClearSelection={handleClearSelection}
-              isGenerating={isGenerating}
-            />
+            {/* Sidebar */}
+            <div className="space-y-6">
+              <WorkflowHistory history={history?.history || []} />
 
-            {/* Generation error */}
-            {generateMutation.error && (
-              <Card className="border-destructive">
-                <CardContent className="pt-6">
-                  <p className="text-destructive text-sm">
-                    Failed to generate newsletter: {generateMutation.error.message}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            <ArticleResults
-              articles={researchResult?.articles || null}
-              metadata={researchResult?.metadata || null}
-              isLoading={isResearching}
-              error={!isResearching ? researchError : null}
-              selectedArticles={selectedArticles}
-              onArticleSelect={handleArticleSelect}
-              onSelectAll={handleSelectAll}
-              onClearSelection={handleClearSelection}
-            />
-          </div>
-
-          {/* Sidebar - Info */}
-          <div className="space-y-6">
-            {/* About */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Info className="h-4 w-4" />
-                  How It Works
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground space-y-3">
-                <div className="space-y-2">
-                  <p className="font-medium text-foreground">1. Research</p>
-                  <p>Enter topics or a custom prompt to discover relevant articles.</p>
-                </div>
-                <div className="space-y-2">
-                  <p className="font-medium text-foreground">2. Select</p>
-                  <p>Choose the articles you want to include in your newsletter.</p>
-                </div>
-                <div className="space-y-2">
-                  <p className="font-medium text-foreground">3. Generate</p>
-                  <p>Pick a tone and generate your AI-powered newsletter.</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* LLM Info */}
-            {status && (
+              {/* Workflow info */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Bot className="h-4 w-4" />
-                    LLM Configuration
-                  </CardTitle>
+                  <CardTitle className="text-sm">Workflow Details</CardTitle>
                 </CardHeader>
-                <CardContent className="text-sm">
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Provider</span>
-                      <span className="font-medium">{status.llm_provider}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Model</span>
-                      <span className="font-medium">{status.llm_model}</span>
-                    </div>
+                <CardContent className="text-sm space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">ID</span>
+                    <span className="font-mono text-xs">{activeWorkflowId.slice(0, 12)}...</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Topics</span>
+                    <span>{workflowData?.topics?.length || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tone</span>
+                    <span className="capitalize">{workflowData?.tone || '-'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Articles</span>
+                    <span>{workflowData?.article_count || 0}</span>
                   </div>
                 </CardContent>
               </Card>
-            )}
-
-            {/* Agents */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Bot className="h-4 w-4" />
-                  Agents
-                </CardTitle>
-                <CardDescription>Agents powering this platform</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {agents && agents.length > 0 ? (
-                  <div className="space-y-3">
-                    {agents.map((agent, index) => (
-                      <div key={agent.id}>
-                        {index > 0 && <Separator className="my-3" />}
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-sm">{agent.name}</span>
-                            <AppStatusBadge status={agent.status} size="sm" />
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {agent.description}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-2">
-                    Loading agents...
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* Dashboard / Generate / Manual views */}
+      {view !== 'workflow' && (
+        <Tabs value={view} onValueChange={(v) => setView(v as AppView)}>
+          <TabsList>
+            <TabsTrigger value="dashboard" className="flex items-center gap-2">
+              <LayoutDashboard className="h-4 w-4" />
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="generate" className="flex items-center gap-2">
+              <Wand2 className="h-4 w-4" />
+              Generate
+            </TabsTrigger>
+            <TabsTrigger value="manual" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Manual Mode
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="dashboard" className="mt-6">
+            <NewsletterDashboard onStartGeneration={() => setView('generate')} />
+          </TabsContent>
+
+          <TabsContent value="generate" className="mt-6">
+            <div className="grid gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <GeneratePanel
+                  onGenerate={handleStartWorkflow}
+                  isLoading={generateWorkflowMutation.isPending}
+                />
+              </div>
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Info className="h-4 w-4" />
+                      How It Works
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm text-muted-foreground space-y-3">
+                    <div className="space-y-2">
+                      <p className="font-medium text-foreground">1. Configure</p>
+                      <p>Set topics, tone, and preferences for your newsletter.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="font-medium text-foreground">2. Review</p>
+                      <p>AI researches and you approve selected articles.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="font-medium text-foreground">3. Generate</p>
+                      <p>AI writes content, you review and edit.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="font-medium text-foreground">4. Send</p>
+                      <p>Final approval and send or schedule.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* LLM Info */}
+                {status && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Bot className="h-4 w-4" />
+                        LLM Configuration
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm">
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Provider</span>
+                          <span className="font-medium">{status.llm_provider}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Model</span>
+                          <span className="font-medium">{status.llm_model}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="manual" className="mt-6">
+            {/* Manual mode - existing research/writing flow */}
+            {manualPhase === 'preview' && generatedNewsletter ? (
+              <div className="space-y-6">
+                <Button variant="outline" onClick={() => setManualPhase('research')}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Research
+                </Button>
+                <NewsletterPreview
+                  result={generatedNewsletter}
+                  onRegenerate={handleGenerate}
+                  isRegenerating={isGenerating}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                  <ResearchPanel onResearch={handleResearch} isLoading={isResearching} />
+                  <WritingPanel
+                    selectedArticles={selectedArticles}
+                    tone={tone}
+                    onToneChange={setTone}
+                    onGenerate={handleGenerate}
+                    onClearSelection={clearSelectedArticles}
+                    isGenerating={isGenerating}
+                  />
+                  <ArticleResults
+                    articles={researchResult?.articles || null}
+                    metadata={researchResult?.metadata || null}
+                    isLoading={isResearching}
+                    error={researchResult?.error}
+                    selectedArticles={selectedArticles}
+                    onArticleSelect={handleArticleSelect}
+                    onSelectAll={() => researchResult?.articles && setSelectedArticles([...researchResult.articles])}
+                    onClearSelection={clearSelectedArticles}
+                  />
+                </div>
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Bot className="h-4 w-4" />
+                        Agents
+                      </CardTitle>
+                      <CardDescription>Agents powering this platform</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {agents && agents.length > 0 ? (
+                        <div className="space-y-3">
+                          {agents.map((agent, index) => (
+                            <div key={agent.id}>
+                              {index > 0 && <Separator className="my-3" />}
+                              <div>
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-sm">{agent.name}</span>
+                                  <AppStatusBadge status={agent.status} size="sm" />
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {agent.description}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center py-2">
+                          Loading agents...
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );
 }
+
+export default NewsletterApp;

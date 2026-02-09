@@ -1,267 +1,191 @@
 # Claude Code Project Instructions
 
-This file contains project-specific patterns, conventions, and gotchas for the agentic-ai-framework.
+Project-specific patterns, conventions, and gotchas for the agentic-ai-framework.
 
 ## Project Structure
 
 ```
 backend/
 ├── app/
-│   ├── common/          # Shared framework code
-│   │   ├── base/        # BaseAgent, BaseChain, BaseOrchestrator
-│   │   └── providers/   # LLM, embeddings, vectorstore providers
+│   ├── common/          # Shared framework code (BaseAgent, providers)
 │   ├── platforms/       # Platform implementations (newsletter, hello_world)
 │   └── db/              # Database connections (MongoDB, Weaviate)
-└── tests/
+frontend/
+├── src/
+│   ├── components/      # React components
+│   ├── pages/           # Route pages
+│   ├── hooks/           # React Query & custom hooks
+│   ├── store/           # Zustand state
+│   ├── api/             # API clients
+│   └── types/           # TypeScript types
+docs/                    # Detailed phase documentation
 ```
 
-## Common Patterns
+## Newsletter Platform Status
 
-### LLM Provider Types
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1-5 | Backend infrastructure | ✅ |
+| 6-10 | Agents & orchestrator | ✅ |
+| 11 | API endpoints | ✅ |
+| 12 | Frontend infrastructure | ✅ |
+| 13 | Frontend components | ✅ |
+| 14 | Integration testing | Next |
 
-**Location:** `app/common/providers/llm.py`
+See `docs/phase*.md` for detailed documentation per phase.
+
+## Backend Patterns
+
+### LLM Providers
 
 ```python
-class LLMProviderType(str, Enum):
-    OPENAI = "openai"
-    OLLAMA = "ollama"
-    AWS_BEDROCK = "aws_bedrock"  # NOT "BEDROCK"
-```
+from app.common.providers.llm import LLMProviderType
 
-**IMPORTANT:** The Bedrock provider is `AWS_BEDROCK`, not `BEDROCK`. Always check the actual enum values before using.
+# Use AWS_BEDROCK, not BEDROCK
+LLMProviderType.AWS_BEDROCK
+
+# Use default_model, not model
+get_llm_provider(provider_type=..., default_model="llama3")
+```
 
 ### Pydantic Models
 
-Use `model_config` dict (Pydantic v2), not deprecated `class Config`:
-
 ```python
-# Correct (Pydantic v2)
+# Pydantic v2 - use model_config dict
 class MyModel(BaseModel):
-    name: str
-
-    model_config = {
-        "populate_by_name": True,
-        "json_encoders": {datetime: lambda v: v.isoformat()},
-    }
-
-# Wrong (deprecated)
-class MyModel(BaseModel):
-    name: str
-
-    class Config:
-        populate_by_name = True
+    model_config = {"populate_by_name": True}
 ```
 
-### DateTime Handling
-
-Use timezone-aware datetimes:
+### DateTime
 
 ```python
-# Correct
+# Use timezone-aware
 from datetime import datetime, timezone
 now = datetime.now(timezone.utc)
-
-# Wrong (deprecated)
-now = datetime.utcnow()
 ```
 
-### Agent Implementation Pattern
-
-Follow the hello_world greeter agent structure:
+### Agent Structure
 
 ```
-agents/{agent_name}/
-├── __init__.py      # Exports
-├── agent.py         # Agent class extending BaseAgent
-├── llm.py           # get_{agent}_llm(), get_{agent}_config()
-├── prompts.py       # Prompt templates
-└── tools.py         # Optional tool definitions
+agents/{name}/
+├── agent.py         # Agent class
+├── llm.py           # get_{name}_llm()
+├── prompts.py       # Templates
+└── tools.py         # Optional
 ```
 
-### Test Patterns
+### BaseAgent Reserved Attributes
 
-1. **Floating point comparisons** - Use `>=` or `pytest.approx()`:
-   ```python
-   # Good
-   assert score >= 0.4
-   assert score == pytest.approx(0.5, rel=0.1)
+Don't overwrite: `self.name`, `self.llm`, `self.memory`, `self.system_prompt`, `self.tools`
 
-   # Bad - too strict
-   assert score > 0.5
-   ```
+## Frontend Patterns
 
-2. **Run tests from backend directory:**
-   ```bash
-   cd backend
-   .venv/bin/python -m pytest app/platforms/newsletter/tests/ -v
-   ```
+### React Query Hooks
 
-3. **Mark integration tests:**
-   ```python
-   @pytest.mark.integration
-   class TestIntegration:
-       ...
-   ```
+```tsx
+// Queries
+const { data, isLoading } = useWorkflow(id);
 
-## Newsletter Platform
-
-### Phase Status
-- Phase 1: Platform Scaffolding ✅
-- Phase 2: MongoDB Models & Repositories ✅
-- Phase 3: Tavily Search Service ✅
-- Phase 4: RAG System (Weaviate) ✅
-- Phase 5: Memory Service (MongoDB TTL) ✅
-- Phase 6: Research Agent ✅ (84 tests)
-- Phase 7: Writing Agent ✅ (84 tests)
-- **Phase 8: Preference & Custom Prompt Agents** ← Next
-- Phase 9: Mindmap Agent
-- Phase 10: Newsletter Orchestrator with HITL
-- Phase 11-15: Email, Testing, Deployment
-
-### Key Services
-
-| Service | Location | Purpose |
-|---------|----------|---------|
-| TavilySearchService | `services/tavily.py` | Web search via Tavily API |
-| NewsletterRAGService | `services/rag.py` | Vector storage in Weaviate |
-| MemoryService | `services/memory.py` | MongoDB cache with TTL |
-| ResearchAgent | `agents/research/` | Content discovery pipeline |
-| WritingAgent | `agents/writing/` | Newsletter content generation |
-
-### Config Pattern
-
-Newsletter config uses prefix `NEWSLETTER_` with fallback to global settings:
-
-```python
-from app.platforms.newsletter.config import config
-
-# These fall back to global if not set
-config.effective_provider  # NEWSLETTER_LLM_PROVIDER or LLM_PROVIDER
-config.effective_model     # NEWSLETTER_LLM_MODEL or LLM_DEFAULT_MODEL
+// Mutations with cache invalidation
+const mutation = useApproveCheckpoint();
+mutation.mutate({ workflowId, request });
 ```
 
-## Environment Variables
+### Zustand Store
 
-### Required for Newsletter
-```bash
-NEWSLETTER_TAVILY_API_KEY=xxx     # Tavily search API
-NEWSLETTER_RESEND_API_KEY=xxx     # Email sending (Phase 11)
+```tsx
+const { activeWorkflowId, setActiveWorkflow } = useWorkflowState();
+const { selectedArticles, toggleArticle } = useArticleSelection();
 ```
 
-### Optional Overrides
-```bash
-NEWSLETTER_LLM_PROVIDER=ollama    # Override global LLM provider
-NEWSLETTER_LLM_MODEL=llama3       # Override global model
+### SSE Integration
+
+```tsx
+useWorkflowSSE(workflowId ?? null, {
+  onStatus: (e) => setStatus(e.status),
+  onCheckpoint: (e) => toast({ title: e.title }),
+  onError: (e) => toast({ variant: 'destructive', ... }),
+});
+```
+
+### Toast Notifications
+
+```tsx
+import { useToast } from '@/components/ui/use-toast';
+const { toast } = useToast();
+toast({ title: 'Success', description: '...' });
 ```
 
 ## Common Gotchas
 
-1. **LLMProviderType.BEDROCK** → Use `AWS_BEDROCK` instead
-2. **datetime.utcnow()** → Use `datetime.now(timezone.utc)`
-3. **class Config** in Pydantic → Use `model_config = {...}`
-4. **Strict float assertions** → Use `>=` or `pytest.approx()`
-5. **Python command** → Use `.venv/bin/python` from backend directory
-6. **LLM Provider kwargs** → Check provider `__init__` signature before passing args
-7. **BaseAgent reserved attributes** → Don't overwrite `self.memory`, `self.llm`, `self.name`
+### Backend
 
-### BaseAgent Reserved Attributes
+| Issue | Solution |
+|-------|----------|
+| `LLMProviderType.BEDROCK` | Use `AWS_BEDROCK` |
+| `datetime.utcnow()` | Use `datetime.now(timezone.utc)` |
+| `class Config` in Pydantic | Use `model_config = {...}` |
+| Float assertions `> 0.5` | Use `>= 0.5` or `pytest.approx()` |
+| Missing `default_model` | Check provider `__init__` signature |
 
-When extending `BaseAgent`, these attributes are used internally and should NOT be overwritten:
+### Frontend
 
-```python
-class BaseAgent:
-    self.name        # Agent name
-    self.llm         # LLM provider instance
-    self.memory      # AgentMemory for conversation history (NOT for caching!)
-    self.system_prompt
-    self.tools
+| Issue | Solution |
+|-------|----------|
+| Toast import | Use `@/components/ui/use-toast` |
+| SSE id type | `useWorkflowSSE(id ?? null, ...)` |
+| Unknown in JSX | Extract to variable, then `String(val)` |
+| Unused imports | Remove or prefix with `_` |
+
+### TypeScript
+
+```tsx
+// useParams returns undefined, SSE expects null
+const { id } = useParams<{ id: string }>();
+useWorkflowSSE(id ?? null, callbacks);
+
+// Handle Record<string, unknown> in JSX
+const msg = item.data.message;
+{msg != null && <p>{String(msg)}</p>}
 ```
 
-**Common mistake:** Using `self.memory` for a caching service:
+## Testing
 
-```python
-# WRONG - overwrites BaseAgent's conversation memory
-class MyAgent(BaseAgent):
-    def __init__(self):
-        super().__init__(...)
-        self.memory = get_cache_service()  # Breaks BaseAgent!
+### Backend
 
-# CORRECT - use a different attribute name
-class MyAgent(BaseAgent):
-    def __init__(self):
-        super().__init__(...)
-        self.cache_service = get_cache_service()  # Safe
+```bash
+cd backend
+.venv/bin/python -m pytest app/platforms/newsletter/tests/ -v
 ```
 
-### LLM Provider Initialization
+### Frontend
 
-Each provider has different `__init__` parameters:
-
-```python
-# OllamaProvider accepts:
-OllamaProvider(base_url=..., default_model=..., timeout=...)
-
-# OpenAIProvider accepts:
-OpenAIProvider(api_key=..., default_model=..., timeout=...)
-
-# AWSBedrockProvider accepts:
-AWSBedrockProvider(region=..., default_model=..., timeout=...)
+```bash
+cd frontend
+npx tsc --noEmit  # Type check
+npm run dev       # Dev server
 ```
 
-**IMPORTANT:** Use `default_model`, NOT `model`:
+## Environment Variables
 
-```python
-# Correct
-get_llm_provider(provider_type=LLMProviderType.OLLAMA, default_model="llama3")
+```bash
+# Required
+NEWSLETTER_TAVILY_API_KEY=xxx
+NEWSLETTER_RESEND_API_KEY=xxx
 
-# Wrong - causes "unexpected keyword argument 'model'"
-get_llm_provider(provider_type=LLMProviderType.OLLAMA, model="llama3")
+# Optional overrides
+NEWSLETTER_LLM_PROVIDER=ollama
+NEWSLETTER_LLM_MODEL=llama3
 ```
 
-## Test Coverage Guidelines
+## Documentation
 
-### Mock at the Right Level
-
-When testing API endpoints that use agents, consider what level to mock:
-
-1. **Mocking the entire agent class** (fast, but misses initialization bugs):
-   ```python
-   # This skips agent.__init__(), so LLM init bugs won't be caught
-   with patch("...routers.research.ResearchAgent") as MockAgent:
-       mock_agent = MagicMock()
-       mock_agent.run = AsyncMock(return_value=result)
-       MockAgent.return_value = mock_agent
-   ```
-
-2. **Mocking agent dependencies** (slower, but catches init bugs):
-   ```python
-   # This runs agent.__init__(), catching LLM/service init issues
-   with patch("...agents.research.agent.get_tavily_service") as mock_tavily, \
-        patch("...agents.research.agent.get_memory_service") as mock_memory, \
-        patch("...agents.research.llm.get_llm_provider") as mock_llm:
-       # Agent init runs, dependencies are mocked
-   ```
-
-### Test Initialization Separately
-
-Always add unit tests for factory functions like `get_*_llm()`:
-
-```python
-def test_get_research_llm_initializes():
-    """Ensure LLM provider can be initialized without errors."""
-    with patch("...get_llm_provider") as mock_provider:
-        mock_provider.return_value = MagicMock()
-        llm = get_research_llm()
-        # Verify correct kwargs were passed
-        mock_provider.assert_called_once()
-        call_kwargs = mock_provider.call_args.kwargs
-        assert "default_model" in call_kwargs or "provider_type" in call_kwargs
-```
-
-### Integration Test Checklist
-
-Before marking a phase complete, ensure:
-- [ ] Unit tests pass with mocked dependencies
-- [ ] Factory functions (`get_*_llm`, `get_*_service`) are tested
-- [ ] At least one integration test exists (can be skipped if requires external API)
-- [ ] Manual smoke test with real services works
+Detailed documentation in `docs/`:
+- `phase7-writing-agent.md`
+- `phase8-preference-custom-prompt-agents.md`
+- `phase9-langgraph-orchestrator.md`
+- `phase10-email-service.md`
+- `phase11-api-endpoints.md`
+- `phase12-frontend-infrastructure.md`
+- `phase13-frontend-components.md`
+- `e2e-testing-plan.md`
