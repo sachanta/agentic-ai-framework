@@ -3,6 +3,7 @@ MongoDB Checkpointer for LangGraph.
 
 Persists workflow state to MongoDB for durable HITL workflows.
 """
+import base64
 import logging
 from datetime import datetime, timezone
 from typing import Any, AsyncIterator, Iterator, Sequence
@@ -14,7 +15,6 @@ from langgraph.checkpoint.base import (
     CheckpointMetadata,
     CheckpointTuple,
     ChannelVersions,
-    PendingWrite,
 )
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -106,11 +106,13 @@ class MongoDBSaver(BaseCheckpointSaver):
 
     def _serialize_checkpoint(self, checkpoint: Checkpoint) -> dict:
         """Serialize checkpoint for MongoDB storage."""
+        type_str, data_bytes = self.serde.dumps_typed(checkpoint["channel_values"])
         return {
             "v": checkpoint["v"],
             "id": checkpoint["id"],
             "ts": checkpoint["ts"],
-            "channel_values": self.serde.dumps_typed(checkpoint["channel_values"])[1].decode(),
+            "channel_values": base64.b64encode(data_bytes).decode("ascii"),
+            "channel_values_type": type_str,
             "channel_versions": dict(checkpoint["channel_versions"]),
             "versions_seen": {
                 k: dict(v) for k, v in checkpoint["versions_seen"].items()
@@ -120,11 +122,13 @@ class MongoDBSaver(BaseCheckpointSaver):
 
     def _deserialize_checkpoint(self, data: dict) -> Checkpoint:
         """Deserialize checkpoint from MongoDB storage."""
+        type_str = data.get("channel_values_type", self.serde.dumps_typed({})[0])
+        channel_bytes = base64.b64decode(data["channel_values"])
         return Checkpoint(
             v=data["v"],
             id=data["id"],
             ts=data["ts"],
-            channel_values=self.serde.loads_typed((self.serde.dumps_typed({})[0], data["channel_values"].encode())),
+            channel_values=self.serde.loads_typed((type_str, channel_bytes)),
             channel_versions=data["channel_versions"],
             versions_seen={
                 k: v for k, v in data["versions_seen"].items()
@@ -171,11 +175,13 @@ class MongoDBSaver(BaseCheckpointSaver):
         }))
 
         pending_writes = [
-            PendingWrite(
-                task_id=w["task_id"],
-                task_path=w.get("task_path", ""),
-                channel=w["channel"],
-                value=self.serde.loads_typed((self.serde.dumps_typed({})[0], w["value"].encode())),
+            (
+                w["task_id"],
+                w["channel"],
+                self.serde.loads_typed((
+                    w.get("value_type", self.serde.dumps_typed({})[0]),
+                    base64.b64decode(w["value"]),
+                )),
             )
             for w in writes_docs
         ] if writes_docs else None
@@ -308,19 +314,20 @@ class MongoDBSaver(BaseCheckpointSaver):
         if not checkpoint_id:
             return
 
-        docs = [
-            {
+        docs = []
+        for channel, value in writes:
+            type_str, data_bytes = self.serde.dumps_typed(value)
+            docs.append({
                 "thread_id": thread_id,
                 "checkpoint_ns": checkpoint_ns,
                 "checkpoint_id": checkpoint_id,
                 "task_id": task_id,
                 "task_path": task_path,
                 "channel": channel,
-                "value": self.serde.dumps_typed(value)[1].decode(),
+                "value": base64.b64encode(data_bytes).decode("ascii"),
+                "value_type": type_str,
                 "created_at": datetime.now(timezone.utc),
-            }
-            for channel, value in writes
-        ]
+            })
 
         if docs:
             self.db[WRITES_COLLECTION].insert_many(docs)
@@ -362,11 +369,13 @@ class MongoDBSaver(BaseCheckpointSaver):
         writes_docs = await writes_cursor.to_list(length=100)
 
         pending_writes = [
-            PendingWrite(
-                task_id=w["task_id"],
-                task_path=w.get("task_path", ""),
-                channel=w["channel"],
-                value=self.serde.loads_typed((self.serde.dumps_typed({})[0], w["value"].encode())),
+            (
+                w["task_id"],
+                w["channel"],
+                self.serde.loads_typed((
+                    w.get("value_type", self.serde.dumps_typed({})[0]),
+                    base64.b64decode(w["value"]),
+                )),
             )
             for w in writes_docs
         ] if writes_docs else None
@@ -499,19 +508,20 @@ class MongoDBSaver(BaseCheckpointSaver):
         if not checkpoint_id:
             return
 
-        docs = [
-            {
+        docs = []
+        for channel, value in writes:
+            type_str, data_bytes = self.serde.dumps_typed(value)
+            docs.append({
                 "thread_id": thread_id,
                 "checkpoint_ns": checkpoint_ns,
                 "checkpoint_id": checkpoint_id,
                 "task_id": task_id,
                 "task_path": task_path,
                 "channel": channel,
-                "value": self.serde.dumps_typed(value)[1].decode(),
+                "value": base64.b64encode(data_bytes).decode("ascii"),
+                "value_type": type_str,
                 "created_at": datetime.now(timezone.utc),
-            }
-            for channel, value in writes
-        ]
+            })
 
         if docs:
             await self.async_db[WRITES_COLLECTION].insert_many(docs)

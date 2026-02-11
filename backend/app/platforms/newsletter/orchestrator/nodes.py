@@ -4,7 +4,7 @@ LangGraph Workflow Nodes.
 Defines all nodes for the newsletter generation workflow.
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -366,7 +366,7 @@ def checkpoint_articles_node(state: NewsletterState) -> dict[str, Any]:
 
     checkpoint_data = CheckpointData(
         checkpoint_id=str(uuid4()),
-        checkpoint_type="article_review",
+        checkpoint_type="research_review",
         title="Review Article Selection",
         description=f"Review {len(articles)} articles found for your newsletter",
         data={
@@ -384,7 +384,7 @@ def checkpoint_articles_node(state: NewsletterState) -> dict[str, Any]:
             "total_found": len(articles),
         },
         actions=["approve", "edit", "reject"],
-        created_at=datetime.utcnow().isoformat(),
+        created_at=datetime.now(timezone.utc).isoformat(),
     )
 
     # Interrupt and wait for human input
@@ -408,14 +408,14 @@ def checkpoint_articles_node(state: NewsletterState) -> dict[str, Any]:
             "articles": edited_articles,
             "current_checkpoint": None,
             "checkpoint_response": response,
-            "checkpoints_completed": state.get("checkpoints_completed", []) + ["article_review"],
+            "checkpoints_completed": state.get("checkpoints_completed", []) + ["research_review"],
         }
 
     # Approved
     return {
         "current_checkpoint": None,
         "checkpoint_response": response,
-        "checkpoints_completed": state.get("checkpoints_completed", []) + ["article_review"],
+        "checkpoints_completed": state.get("checkpoints_completed", []) + ["research_review"],
     }
 
 
@@ -437,7 +437,7 @@ def checkpoint_content_node(state: NewsletterState) -> dict[str, Any]:
             "tone": state.get("tone", "professional"),
         },
         actions=["approve", "edit", "reject"],
-        created_at=datetime.utcnow().isoformat(),
+        created_at=datetime.now(timezone.utc).isoformat(),
     )
 
     response = interrupt(checkpoint_data)
@@ -484,7 +484,7 @@ def checkpoint_subjects_node(state: NewsletterState) -> dict[str, Any]:
             "tone": state.get("tone", "professional"),
         },
         actions=["approve", "edit", "reject"],
-        created_at=datetime.utcnow().isoformat(),
+        created_at=datetime.now(timezone.utc).isoformat(),
     )
 
     response = interrupt(checkpoint_data)
@@ -519,7 +519,7 @@ def checkpoint_send_node(state: NewsletterState) -> dict[str, Any]:
     """
     checkpoint_data = CheckpointData(
         checkpoint_id=str(uuid4()),
-        checkpoint_type="send_approval",
+        checkpoint_type="final_review",
         title="Approve Newsletter Send",
         description="Final review before sending the newsletter",
         data={
@@ -530,7 +530,7 @@ def checkpoint_send_node(state: NewsletterState) -> dict[str, Any]:
             "newsletter_id": state.get("newsletter_id"),
         },
         actions=["send", "schedule", "cancel"],
-        created_at=datetime.utcnow().isoformat(),
+        created_at=datetime.now(timezone.utc).isoformat(),
     )
 
     response = interrupt(checkpoint_data)
@@ -541,7 +541,7 @@ def checkpoint_send_node(state: NewsletterState) -> dict[str, Any]:
             "current_checkpoint": None,
             "checkpoint_response": response,
             "status": "cancelled",
-            "checkpoints_completed": state.get("checkpoints_completed", []) + ["send_approval"],
+            "checkpoints_completed": state.get("checkpoints_completed", []) + ["final_review"],
         }
 
     if action == "schedule":
@@ -551,14 +551,14 @@ def checkpoint_send_node(state: NewsletterState) -> dict[str, Any]:
             "current_checkpoint": None,
             "checkpoint_response": response,
             "status": "scheduled",
-            "checkpoints_completed": state.get("checkpoints_completed", []) + ["send_approval"],
+            "checkpoints_completed": state.get("checkpoints_completed", []) + ["final_review"],
         }
 
     # Send now
     return {
         "current_checkpoint": None,
         "checkpoint_response": response,
-        "checkpoints_completed": state.get("checkpoints_completed", []) + ["send_approval"],
+        "checkpoints_completed": state.get("checkpoints_completed", []) + ["final_review"],
     }
 
 

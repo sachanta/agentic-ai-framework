@@ -21,6 +21,7 @@ import {
   WorkflowTracker,
   ArticleReview,
   ContentReview,
+  SubjectReview,
   FinalApproval,
   WorkflowHistory,
 } from './workflow';
@@ -48,6 +49,7 @@ import {
   LayoutDashboard,
   Wand2,
   FileText,
+  GitBranch,
   X,
 } from 'lucide-react';
 import type { Article, ResearchResponse, GenerateResponse, WritingTone, CheckpointAction } from '@/types/newsletter';
@@ -349,6 +351,20 @@ export function NewsletterApp() {
           />
         );
 
+      case 'subject_review':
+        return (
+          <SubjectReview
+            checkpoint={checkpoint}
+            subjectLines={(checkpointData.subject_lines as any[]) || []}
+            onApprove={(subject, feedback) => {
+              handleApproveCheckpoint({ subject }, feedback);
+            }}
+            onReject={handleRejectCheckpoint}
+            isLoading={isWorkflowLoading}
+            loadingAction={loadingAction}
+          />
+        );
+
       case 'final_review':
         return (
           <FinalApproval
@@ -420,96 +436,26 @@ export function NewsletterApp() {
         </div>
       </div>
 
-      {/* Workflow view */}
-      {view === 'workflow' && activeWorkflowId && (
-        <div className="space-y-6">
-          {/* Workflow tracker */}
-          <Card>
-            <CardContent className="pt-6">
-              <WorkflowTracker
-                currentStep={workflowData?.current_step || null}
-                completedSteps={workflowData?.checkpoints_completed || []}
-                status={workflowData?.status || null}
-              />
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Checkpoint UI */}
-            <div className="lg:col-span-2">
-              {workflowData?.status === 'awaiting_approval' && checkpoint ? (
-                renderCheckpointUI()
-              ) : workflowData?.status === 'running' ? (
-                <Card>
-                  <CardContent className="py-12 text-center">
-                    <div className="animate-pulse">
-                      <Wand2 className="h-12 w-12 mx-auto text-primary mb-4" />
-                      <p className="text-lg font-medium">Processing...</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {workflowData?.current_step?.replace(/_/g, ' ') || 'Starting workflow'}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardContent className="py-8 text-center text-muted-foreground">
-                    Workflow status: {workflowData?.status || 'Loading...'}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {/* Sidebar */}
-            <div className="space-y-6">
-              <WorkflowHistory history={history?.history || []} />
-
-              {/* Workflow info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Workflow Details</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">ID</span>
-                    <span className="font-mono text-xs">{activeWorkflowId.slice(0, 12)}...</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Topics</span>
-                    <span>{workflowData?.topics?.length || 0}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tone</span>
-                    <span className="capitalize">{workflowData?.tone || '-'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Articles</span>
-                    <span>{workflowData?.article_count || 0}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Dashboard / Generate / Manual views */}
-      {view !== 'workflow' && (
-        <Tabs value={view} onValueChange={(v) => setView(v as AppView)}>
-          <TabsList>
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
-              <LayoutDashboard className="h-4 w-4" />
-              Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="generate" className="flex items-center gap-2">
-              <Wand2 className="h-4 w-4" />
-              Generate
-            </TabsTrigger>
-            <TabsTrigger value="manual" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Manual Mode
-            </TabsTrigger>
-          </TabsList>
+      {/* Dashboard / Generate / Manual / Workflow views */}
+      <Tabs value={view} onValueChange={(v) => setView(v as AppView)}>
+        <TabsList>
+          <TabsTrigger value="dashboard" className="flex items-center gap-2">
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="generate" className="flex items-center gap-2">
+            <Wand2 className="h-4 w-4" />
+            Generate
+          </TabsTrigger>
+          <TabsTrigger value="manual" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Manual Mode
+          </TabsTrigger>
+          <TabsTrigger value="workflow" className="flex items-center gap-2">
+            <GitBranch className="h-4 w-4" />
+            Workflow
+          </TabsTrigger>
+        </TabsList>
 
           <TabsContent value="dashboard" className="mt-6">
             <NewsletterDashboard onStartGeneration={() => setView('generate')} />
@@ -653,8 +599,95 @@ export function NewsletterApp() {
               </div>
             )}
           </TabsContent>
+
+          <TabsContent value="workflow" className="mt-6">
+            {activeWorkflowId ? (
+              <div className="space-y-6">
+                {/* Workflow tracker */}
+                <Card>
+                  <CardContent className="pt-6">
+                    <WorkflowTracker
+                      currentStep={workflowData?.current_step || null}
+                      completedSteps={workflowData?.checkpoints_completed || []}
+                      status={workflowData?.status || null}
+                    />
+                  </CardContent>
+                </Card>
+
+                <div className="grid gap-6 lg:grid-cols-3">
+                  {/* Checkpoint UI */}
+                  <div className="lg:col-span-2">
+                    {workflowData?.status === 'awaiting_approval' && checkpoint ? (
+                      renderCheckpointUI()
+                    ) : workflowData?.status === 'running' ? (
+                      <Card>
+                        <CardContent className="py-12 text-center">
+                          <div className="animate-pulse">
+                            <Wand2 className="h-12 w-12 mx-auto text-primary mb-4" />
+                            <p className="text-lg font-medium">Processing...</p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {workflowData?.current_step?.replace(/_/g, ' ') || 'Starting workflow'}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <Card>
+                        <CardContent className="py-8 text-center text-muted-foreground">
+                          Workflow status: {workflowData?.status || 'Loading...'}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+
+                  {/* Sidebar */}
+                  <div className="space-y-6">
+                    <WorkflowHistory history={history?.history || []} />
+
+                    {/* Workflow info */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">Workflow Details</CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-sm space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">ID</span>
+                          <span className="font-mono text-xs">{activeWorkflowId.slice(0, 12)}...</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Topics</span>
+                          <span>{workflowData?.topics?.length || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Tone</span>
+                          <span className="capitalize">{workflowData?.tone || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Articles</span>
+                          <span>{workflowData?.article_count || 0}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <GitBranch className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium">No Active Workflow</p>
+                  <p className="text-sm text-muted-foreground mt-1 mb-4">
+                    Start a new workflow from the Generate tab to begin newsletter creation.
+                  </p>
+                  <Button variant="outline" onClick={() => setView('generate')}>
+                    <Wand2 className="h-4 w-4 mr-2" />
+                    Go to Generate
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
         </Tabs>
-      )}
     </div>
   );
 }

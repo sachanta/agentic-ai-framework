@@ -214,8 +214,19 @@ class NewsletterOrchestrator(BaseOrchestrator):
             checkpoint = state.get("current_checkpoint")
 
             if not checkpoint:
-                # Build checkpoint from interrupt data
-                # The interrupt value is stored in the state
+                # Extract checkpoint data from the interrupt value
+                # LangGraph stores interrupt values in state_snapshot.tasks[].interrupts[].value
+                for task in state_snapshot.tasks:
+                    if hasattr(task, 'interrupts') and task.interrupts:
+                        interrupt_value = task.interrupts[0].value
+                        if hasattr(interrupt_value, '__dict__'):
+                            # CheckpointData dataclass/object
+                            checkpoint = vars(interrupt_value)
+                        elif isinstance(interrupt_value, dict):
+                            checkpoint = interrupt_value
+                        break
+
+            if not checkpoint:
                 return {
                     "workflow_id": workflow_id,
                     "checkpoint_type": state_snapshot.next[0] if state_snapshot.next else "unknown",

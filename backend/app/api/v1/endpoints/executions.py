@@ -21,11 +21,24 @@ async def list_executions(
     return []
 
 
+@router.get("/stats")
+async def get_execution_stats():
+    """Get execution statistics."""
+    # TODO: Implement execution stats
+    return {
+        "total": 0,
+        "completed": 0,
+        "failed": 0,
+        "running": 0,
+        "pending": 0,
+    }
+
+
 @router.get("/{execution_id}", response_model=ExecutionResponse)
 async def get_execution(execution_id: str):
     """Get execution by ID."""
     # TODO: Implement execution retrieval
-    pass
+    raise HTTPException(status_code=404, detail="Execution not found")
 
 
 @router.post("/{execution_id}/cancel")

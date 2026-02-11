@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from datetime import datetime
 
-from app.core.security import get_current_user
+from app.core.security import get_current_user, decode_access_token
 from app.platforms.newsletter.services import NewsletterService
 from app.platforms.newsletter.orchestrator import get_newsletter_orchestrator
 
@@ -343,14 +343,25 @@ async def get_workflow_history(
 @router.get("/{workflow_id}/stream")
 async def stream_workflow_progress(
     workflow_id: str = Path(..., description="Workflow ID"),
-    current_user: dict = Depends(get_current_user),
+    token: Optional[str] = Query(None, description="JWT token for SSE auth (EventSource cannot set headers)"),
 ):
     """
     Stream workflow progress via Server-Sent Events (SSE).
 
     Returns real-time updates as the workflow progresses.
     Connect with EventSource to receive updates.
+
+    Accepts auth via ?token= query parameter since EventSource
+    cannot set Authorization headers.
     """
+    # Validate token from query parameter
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    payload = decode_access_token(token)
+    if payload is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
     async def event_generator():
         orchestrator = get_newsletter_orchestrator()
         last_status = None

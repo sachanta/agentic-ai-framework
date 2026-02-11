@@ -199,7 +199,7 @@ export interface WorkflowListResponse {
 
 export interface Checkpoint {
   checkpoint_id: string;
-  checkpoint_type: 'research_review' | 'content_review' | 'final_review';
+  checkpoint_type: 'research_review' | 'content_review' | 'subject_review' | 'final_review';
   title: string;
   description: string;
   data: CheckpointData;
