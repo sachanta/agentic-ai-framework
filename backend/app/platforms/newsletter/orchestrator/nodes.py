@@ -185,12 +185,12 @@ async def generate_content_node(state: NewsletterState) -> dict[str, Any]:
         })
 
         if result.get("success"):
-            content = result.get("content", {})
+            newsletter = result.get("newsletter", {})
             return {
-                "newsletter_content": content.get("markdown", ""),
-                "newsletter_html": content.get("html", ""),
-                "newsletter_plain": content.get("plain_text", ""),
-                "word_count": content.get("word_count", 0),
+                "newsletter_content": newsletter.get("markdown", newsletter.get("content", "")),
+                "newsletter_html": newsletter.get("html", ""),
+                "newsletter_plain": newsletter.get("text", ""),
+                "word_count": newsletter.get("word_count", len(newsletter.get("content", "").split())),
                 "content_generated": True,
                 "current_step": "generate_content",
             }
@@ -206,6 +206,40 @@ async def generate_content_node(state: NewsletterState) -> dict[str, Any]:
             "content_generated": False,
             "error": str(e),
         }
+
+
+def _extract_subject_text(subject_lines: list, default: str = "Newsletter") -> str:
+    """Extract text from the first subject line (handles both str and dict formats)."""
+    if not subject_lines:
+        return default
+    first = subject_lines[0]
+    if isinstance(first, dict):
+        return first.get("text", default)
+    return str(first) if first else default
+
+
+def _normalize_subject_lines(raw_subjects: list, default_tone: str = "professional") -> list[dict]:
+    """Normalize subject lines to {text, style} format expected by frontend."""
+    # Map WritingAgent 'angle' values to frontend 'style' values
+    angle_to_style = {
+        "curiosity": "casual",
+        "benefit": "professional",
+        "question": "casual",
+        "news": "professional",
+        "urgency": "urgent",
+        "direct": "professional",
+    }
+    normalized = []
+    for s in raw_subjects:
+        if isinstance(s, dict):
+            text = s.get("text", "")
+            style = s.get("style") or angle_to_style.get(s.get("angle", ""), default_tone)
+            normalized.append({"text": text, "style": style})
+        elif isinstance(s, str):
+            normalized.append({"text": s, "style": default_tone})
+        else:
+            normalized.append({"text": str(s), "style": default_tone})
+    return normalized
 
 
 async def create_subjects_node(state: NewsletterState) -> dict[str, Any]:
@@ -228,7 +262,9 @@ async def create_subjects_node(state: NewsletterState) -> dict[str, Any]:
         })
 
         if result.get("success"):
-            subjects = result.get("subject_lines", [])
+            raw_subjects = result.get("subject_lines", [])
+            # Normalize to {text, style} format for frontend
+            subjects = _normalize_subject_lines(raw_subjects, state.get("tone", "professional"))
             return {
                 "subject_lines": subjects,
                 "subjects_generated": True,
@@ -237,7 +273,7 @@ async def create_subjects_node(state: NewsletterState) -> dict[str, Any]:
         else:
             # Fallback subject
             return {
-                "subject_lines": ["Your Newsletter Update"],
+                "subject_lines": [{"text": "Your Newsletter Update", "style": "professional"}],
                 "subjects_generated": True,
                 "current_step": "create_subjects",
             }
@@ -245,7 +281,7 @@ async def create_subjects_node(state: NewsletterState) -> dict[str, Any]:
     except Exception as e:
         logger.error(f"Error creating subjects: {e}")
         return {
-            "subject_lines": ["Your Newsletter Update"],
+            "subject_lines": [{"text": "Your Newsletter Update", "style": "professional"}],
             "subjects_generated": True,
             "error": str(e),
         }
@@ -299,12 +335,15 @@ async def store_newsletter_node(state: NewsletterState) -> dict[str, Any]:
         # Create newsletter document
         newsletter = Newsletter(
             user_id=state["user_id"],
-            title=state.get("selected_subject") or state.get("subject_lines", ["Newsletter"])[0],
+            title=state.get("selected_subject") or _extract_subject_text(state.get("subject_lines", []), "Newsletter"),
             content=state.get("newsletter_content", ""),
             html_content=state.get("newsletter_html", ""),
             plain_text=state.get("newsletter_plain", ""),
             subject_line=state.get("selected_subject"),
-            subject_line_options=state.get("subject_lines", []),
+            subject_line_options=[
+                s.get("text", str(s)) if isinstance(s, dict) else str(s)
+                for s in state.get("subject_lines", [])
+            ],
             status=NewsletterStatus.READY,
             workflow_id=state["workflow_id"],
             topics_covered=state.get("topics", []),
@@ -341,7 +380,11 @@ async def send_email_node(state: NewsletterState) -> dict[str, Any]:
 
     Sends the newsletter to subscribers (Phase 10 integration).
     """
-    logger.info("Sending newsletter")
+    test_recipients = state.get("test_recipients", [])
+    if test_recipients:
+        logger.info(f"Sending newsletter to {len(test_recipients)} test recipient(s): {test_recipients}")
+    else:
+        logger.info("Sending newsletter (no recipients configured)")
 
     # TODO: Integrate with Email Service (Phase 10)
     # For now, just mark as complete
@@ -554,12 +597,16 @@ def checkpoint_send_node(state: NewsletterState) -> dict[str, Any]:
             "checkpoints_completed": state.get("checkpoints_completed", []) + ["final_review"],
         }
 
-    # Send now
-    return {
+    # Send now — pass along any test recipients from the frontend
+    test_recipients = response.get("test_recipients", [])
+    result: dict[str, Any] = {
         "current_checkpoint": None,
         "checkpoint_response": response,
         "checkpoints_completed": state.get("checkpoints_completed", []) + ["final_review"],
     }
+    if test_recipients:
+        result["test_recipients"] = test_recipients
+    return result
 
 
 __all__ = [

@@ -182,9 +182,14 @@ class MemoryService:
                 return None
 
             # Check if expired (TTL index should handle this, but double-check)
-            if doc.get("expires_at") and doc["expires_at"] < datetime.now(timezone.utc):
-                logger.debug(f"Cache entry expired: {composite_key}")
-                return None
+            expires_at = doc.get("expires_at")
+            if expires_at:
+                # Ensure timezone-aware comparison (MongoDB may return naive datetimes)
+                if expires_at.tzinfo is None:
+                    expires_at = expires_at.replace(tzinfo=timezone.utc)
+                if expires_at < datetime.now(timezone.utc):
+                    logger.debug(f"Cache entry expired: {composite_key}")
+                    return None
 
             return self._deserialize_value(doc.get("value"))
 

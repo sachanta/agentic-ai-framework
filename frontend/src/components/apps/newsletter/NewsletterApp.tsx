@@ -60,11 +60,7 @@ type ManualPhase = 'research' | 'writing' | 'preview';
 export function NewsletterApp() {
   const { toast } = useToast();
 
-  // View management
-  const [view, setView] = useState<AppView>('dashboard');
-  const [manualPhase, setManualPhase] = useState<ManualPhase>('research');
-
-  // Workflow state from store
+  // Workflow state from store (read first so we can set initial view)
   const {
     activeWorkflowId,
     setActiveWorkflow,
@@ -72,6 +68,10 @@ export function NewsletterApp() {
     setCheckpointData,
     clearWorkflowState,
   } = useWorkflowState();
+
+  // View management — auto-open workflow tab if a workflow was active before refresh
+  const [view, setView] = useState<AppView>(activeWorkflowId ? 'workflow' : 'dashboard');
+  const [manualPhase, setManualPhase] = useState<ManualPhase>('research');
 
   // Article selection from store
   const { selectedArticles, setSelectedArticles, clearSelectedArticles } = useArticleSelection();
@@ -337,8 +337,11 @@ export function NewsletterApp() {
         return (
           <ContentReview
             checkpoint={checkpoint}
-            content={checkpointData.newsletter as any || { content: '', word_count: 0 }}
-            formats={checkpointData.formats as any}
+            content={(checkpointData.newsletter as any) || {
+              content: String(checkpointData.content || ''),
+              word_count: Number(checkpointData.word_count || 0),
+            }}
+            formats={(checkpointData.formats as any) || (checkpointData.html_preview ? { html: String(checkpointData.html_preview) } : undefined)}
             onApprove={(content, feedback) => {
               handleApproveCheckpoint({ content }, feedback);
             }}
@@ -355,9 +358,11 @@ export function NewsletterApp() {
         return (
           <SubjectReview
             checkpoint={checkpoint}
-            subjectLines={(checkpointData.subject_lines as any[]) || []}
+            subjectLines={((checkpointData.subject_lines as any[]) || []).map((s: any) =>
+              typeof s === 'string' ? { text: s, style: 'professional' } : { text: s.text || String(s), style: s.style || s.angle || 'professional' }
+            )}
             onApprove={(subject, feedback) => {
-              handleApproveCheckpoint({ subject }, feedback);
+              handleApproveCheckpoint({ selected_subject: subject }, feedback);
             }}
             onReject={handleRejectCheckpoint}
             isLoading={isWorkflowLoading}
@@ -370,11 +375,12 @@ export function NewsletterApp() {
           <FinalApproval
             checkpoint={checkpoint}
             subject={String(checkpointData.subject || '')}
-            content={String(checkpointData.content || '')}
-            formats={checkpointData.formats as any}
-            articleCount={workflowData.article_count}
-            onApprove={(scheduleAt, feedback) => {
-              handleApproveCheckpoint({ schedule_at: scheduleAt }, feedback);
+            content={String(checkpointData.preview_html || checkpointData.content || '')}
+            formats={(checkpointData.formats as any) || (checkpointData.preview_html ? { html: String(checkpointData.preview_html) } : undefined)}
+            articleCount={Number(checkpointData.word_count || workflowData.article_count || 0)}
+            recipientCount={Number(checkpointData.recipient_count || 0)}
+            onApprove={(scheduleAt, feedback, testRecipients) => {
+              handleApproveCheckpoint({ schedule_at: scheduleAt, test_recipients: testRecipients }, feedback);
             }}
             onReject={handleRejectCheckpoint}
             isLoading={isWorkflowLoading}
@@ -437,7 +443,7 @@ export function NewsletterApp() {
       </div>
 
       {/* Dashboard / Generate / Manual / Workflow views */}
-      <Tabs value={view} onValueChange={(v) => setView(v as AppView)}>
+      <Tabs value={view} onValueChange={(v) => setView(v as AppView)} className="w-full">
         <TabsList>
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <LayoutDashboard className="h-4 w-4" />
@@ -614,62 +620,61 @@ export function NewsletterApp() {
                   </CardContent>
                 </Card>
 
-                <div className="grid gap-6 lg:grid-cols-3">
-                  {/* Checkpoint UI */}
-                  <div className="lg:col-span-2">
-                    {workflowData?.status === 'awaiting_approval' && checkpoint ? (
-                      renderCheckpointUI()
-                    ) : workflowData?.status === 'running' ? (
-                      <Card>
-                        <CardContent className="py-12 text-center">
-                          <div className="animate-pulse">
-                            <Wand2 className="h-12 w-12 mx-auto text-primary mb-4" />
-                            <p className="text-lg font-medium">Processing...</p>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {workflowData?.current_step?.replace(/_/g, ' ') || 'Starting workflow'}
-                            </p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ) : (
-                      <Card>
-                        <CardContent className="py-8 text-center text-muted-foreground">
-                          Workflow status: {workflowData?.status || 'Loading...'}
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
+                {/* Workflow info bar */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="p-3 flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">ID</span>
+                      <span className="font-mono text-xs">{activeWorkflowId.slice(0, 12)}...</span>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3 flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Topics</span>
+                      <span className="text-sm font-medium">{workflowData?.topics?.length || 0}</span>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3 flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Tone</span>
+                      <span className="text-sm font-medium capitalize">{workflowData?.tone || '-'}</span>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3 flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Articles</span>
+                      <span className="text-sm font-medium">{workflowData?.article_count || 0}</span>
+                    </CardContent>
+                  </Card>
+                </div>
 
-                  {/* Sidebar */}
-                  <div className="space-y-6">
-                    <WorkflowHistory history={history?.history || []} />
-
-                    {/* Workflow info */}
+                {/* Checkpoint UI — full width */}
+                <div className="w-full">
+                  {workflowData?.status === 'awaiting_approval' && checkpoint ? (
+                    renderCheckpointUI()
+                  ) : workflowData?.status === 'running' ? (
                     <Card>
-                      <CardHeader>
-                        <CardTitle className="text-sm">Workflow Details</CardTitle>
-                      </CardHeader>
-                      <CardContent className="text-sm space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">ID</span>
-                          <span className="font-mono text-xs">{activeWorkflowId.slice(0, 12)}...</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Topics</span>
-                          <span>{workflowData?.topics?.length || 0}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Tone</span>
-                          <span className="capitalize">{workflowData?.tone || '-'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Articles</span>
-                          <span>{workflowData?.article_count || 0}</span>
+                      <CardContent className="py-12 text-center">
+                        <div className="animate-pulse">
+                          <Wand2 className="h-12 w-12 mx-auto text-primary mb-4" />
+                          <p className="text-lg font-medium">Processing...</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {workflowData?.current_step?.replace(/_/g, ' ') || 'Starting workflow'}
+                          </p>
                         </div>
                       </CardContent>
                     </Card>
-                  </div>
+                  ) : (
+                    <Card>
+                      <CardContent className="py-8 text-center text-muted-foreground">
+                        Workflow status: {workflowData?.status || 'Loading...'}
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
+
+                {/* History — full width, collapsed */}
+                <WorkflowHistory history={history?.history || []} />
               </div>
             ) : (
               <Card>

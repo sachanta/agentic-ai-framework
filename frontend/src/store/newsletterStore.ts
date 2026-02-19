@@ -247,8 +247,9 @@ export const useNewsletterStore = create<NewsletterState>()(
     {
       name: 'newsletter-storage',
       storage: createJSONStorage(() => localStorage),
-      // Only persist UI preferences and form drafts, not workflow state
+      // Persist UI preferences, form drafts, and active workflow ID
       partialize: (state) => ({
+        activeWorkflowId: state.activeWorkflowId,
         researchTopics: state.researchTopics,
         selectedTone: state.selectedTone,
         maxArticles: state.maxArticles,

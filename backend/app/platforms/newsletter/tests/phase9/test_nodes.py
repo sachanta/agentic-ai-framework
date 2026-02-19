@@ -211,10 +211,10 @@ class TestGenerateContentNode:
         mock_agent = MagicMock()
         mock_agent.run = AsyncMock(return_value={
             "success": True,
-            "content": {
+            "newsletter": {
                 "markdown": "# Newsletter\n\nContent here",
                 "html": "<h1>Newsletter</h1>",
-                "plain_text": "Newsletter\n\nContent here",
+                "text": "Newsletter\n\nContent here",
                 "word_count": 50,
             },
         })
@@ -303,7 +303,7 @@ class TestCreateSubjectsNode:
             result = await create_subjects_node(state)
 
             assert result["subjects_generated"] is True
-            assert "Your Newsletter Update" in result["subject_lines"]
+            assert any(s["text"] == "Your Newsletter Update" for s in result["subject_lines"])
 
 
 class TestFormatEmailNode:

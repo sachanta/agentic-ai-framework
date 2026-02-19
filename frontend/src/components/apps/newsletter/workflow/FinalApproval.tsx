@@ -36,7 +36,7 @@ interface FinalApprovalProps {
   formats?: NewsletterFormats;
   articleCount: number;
   recipientCount?: number;
-  onApprove: (scheduleAt?: string, feedback?: string) => void;
+  onApprove: (scheduleAt?: string, feedback?: string, testRecipients?: string[]) => void;
   onReject: (feedback?: string) => void;
   isLoading?: boolean;
   loadingAction?: CheckpointAction | null;
@@ -57,10 +57,18 @@ export function FinalApproval({
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('09:00');
+  const [testEmails, setTestEmails] = useState('');
 
   // Calculate stats
   const wordCount = content.split(/\s+/).filter(Boolean).length;
   const readingTime = Math.ceil(wordCount / 200);
+
+  // Parse test emails
+  const parsedTestEmails = testEmails
+    .split(',')
+    .map((e) => e.trim())
+    .filter((e) => e.includes('@'));
+  const effectiveRecipientCount = recipientCount + parsedTestEmails.length;
 
   // Handle approval
   const handleApprove = () => {
@@ -68,7 +76,7 @@ export function FinalApproval({
     if (scheduleEnabled && scheduleDate) {
       scheduleAt = `${scheduleDate}T${scheduleTime}:00`;
     }
-    onApprove(scheduleAt);
+    onApprove(scheduleAt, undefined, parsedTestEmails.length > 0 ? parsedTestEmails : undefined);
   };
 
   // Get minimum date (today)
@@ -120,7 +128,7 @@ export function FinalApproval({
           <Card>
             <CardContent className="p-4 text-center">
               <Users className="h-5 w-5 mx-auto text-muted-foreground mb-2" />
-              <div className="text-2xl font-bold">{recipientCount}</div>
+              <div className="text-2xl font-bold">{effectiveRecipientCount}</div>
               <div className="text-xs text-muted-foreground">Recipients</div>
             </CardContent>
           </Card>
@@ -143,16 +151,18 @@ export function FinalApproval({
         <div className="space-y-2">
           <Label className="text-sm font-medium">Content Preview</Label>
           <Card>
-            <ScrollArea className="h-[300px]">
-              {formats?.html ? (
-                <div
-                  className="p-4 prose prose-sm dark:prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: formats.html }}
-                />
-              ) : (
+            {formats?.html ? (
+              <iframe
+                srcDoc={formats.html}
+                title="Newsletter preview"
+                className="w-full h-[300px] border-0"
+                sandbox="allow-same-origin"
+              />
+            ) : (
+              <ScrollArea className="h-[300px]">
                 <pre className="p-4 text-sm whitespace-pre-wrap">{content}</pre>
-              )}
-            </ScrollArea>
+              </ScrollArea>
+            )}
           </Card>
         </div>
 
@@ -198,13 +208,27 @@ export function FinalApproval({
           )}
         </div>
 
-        {/* Warning if no recipients */}
+        {/* Test email input (shown when no subscribers) */}
         {recipientCount === 0 && (
-          <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950 rounded-lg text-amber-600 dark:text-amber-400">
-            <AlertCircle className="h-4 w-4 flex-shrink-0" />
-            <span className="text-sm">
-              No recipients configured. Add subscribers before sending.
-            </span>
+          <div className="space-y-2 p-4 bg-amber-50 dark:bg-amber-950 rounded-lg">
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span className="text-sm font-medium">
+                No subscribers configured. Enter test email(s) to send anyway:
+              </span>
+            </div>
+            <Input
+              type="text"
+              value={testEmails}
+              onChange={(e) => setTestEmails(e.target.value)}
+              placeholder="email@example.com, another@example.com"
+              className="bg-background"
+            />
+            {parsedTestEmails.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Will send to {parsedTestEmails.length} test recipient{parsedTestEmails.length > 1 ? 's' : ''}
+              </p>
+            )}
           </div>
         )}
 
@@ -214,7 +238,7 @@ export function FinalApproval({
         <div className="flex items-center justify-center gap-3">
           <Button
             onClick={handleApprove}
-            disabled={isLoading || (scheduleEnabled && !scheduleDate)}
+            disabled={isLoading || (scheduleEnabled && !scheduleDate) || effectiveRecipientCount === 0}
             className="min-w-[150px]"
           >
             {isLoading && loadingAction === 'approve' ? (

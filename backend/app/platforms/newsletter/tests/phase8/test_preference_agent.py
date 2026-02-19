@@ -251,10 +251,10 @@ class TestPreferenceAgentUpdatePreferences:
             updates = PreferenceUpdate(topics=["AI", "ML"])
             await agent.update_preferences("test_user", updates)
 
-            # Verify set was called
+            # Verify set was called with correct args (user_id, CacheType, key, data)
             mock_memory_instance.set.assert_called_once()
             call_args = mock_memory_instance.set.call_args
-            assert "preferences:test_user" in call_args[0][0]
+            assert call_args[0][0] == "test_user"
 
 
 class TestPreferenceAgentAnalyze:

@@ -63,7 +63,7 @@ class NewsletterState(TypedDict, total=False):
     content_generated: bool
 
     # ─── Subject Lines (from WritingAgent) ──────────────────────────
-    subject_lines: list[str]
+    subject_lines: list[dict[str, str]]
     selected_subject: str | None
     subjects_generated: bool
 
@@ -87,6 +87,7 @@ class NewsletterState(TypedDict, total=False):
     email_sent: bool
     email_scheduled: str | None  # ISO datetime if scheduled
     recipient_count: int
+    test_recipients: list[str]  # Ad-hoc test emails from final approval
 
     # ─── History & Timestamps ───────────────────────────────────────
     history: list[dict[str, Any]]

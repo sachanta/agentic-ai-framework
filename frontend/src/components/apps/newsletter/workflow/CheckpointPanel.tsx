@@ -53,7 +53,7 @@ export function CheckpointPanel({
   };
 
   return (
-    <Card className={cn('border-primary/20', className)}>
+    <Card className={cn('border-primary/20 w-full max-w-full', className)}>
       <CardHeader className="bg-primary/5 border-b">
         <div className="flex items-start justify-between">
           <div>

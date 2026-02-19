@@ -14,6 +14,8 @@ This orchestrator coordinates the newsletter generation workflow:
 import logging
 from typing import Any, Dict, Optional
 
+from langgraph.types import Command
+
 from app.common.base.orchestrator import BaseOrchestrator
 from app.platforms.newsletter.orchestrator.state import (
     NewsletterState,
@@ -170,10 +172,22 @@ class NewsletterOrchestrator(BaseOrchestrator):
             else:
                 status = state.get("status", "unknown")
 
+            # Map checkpoint node names to frontend step IDs
+            current_step = state.get("current_step")
+            if state_snapshot.next:
+                node_to_step = {
+                    "checkpoint_articles": "research_review",
+                    "checkpoint_content": "content_review",
+                    "checkpoint_subjects": "subject_review",
+                    "checkpoint_send": "final_review",
+                }
+                next_node = state_snapshot.next[0]
+                current_step = node_to_step.get(next_node, current_step)
+
             return {
                 "workflow_id": workflow_id,
                 "status": status,
-                "current_step": state.get("current_step"),
+                "current_step": current_step,
                 "current_checkpoint": state.get("current_checkpoint"),
                 "checkpoints_completed": state.get("checkpoints_completed", []),
                 "created_at": state.get("created_at"),
@@ -278,12 +292,11 @@ class NewsletterOrchestrator(BaseOrchestrator):
             if feedback:
                 response["feedback"] = feedback
 
-            # Resume the workflow with the human response
+            # Resume the workflow from the interrupt with the human response
             logger.info(f"Resuming workflow {workflow_id} with action: {action}")
 
-            # Update state with the response and resume
             result = await self.graph.ainvoke(
-                {"checkpoint_response": response},
+                Command(resume=response),
                 config,
             )
 

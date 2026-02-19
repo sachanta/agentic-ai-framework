@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
 from app.common.base.agent import BaseAgent
-from app.platforms.newsletter.services.memory import get_memory_service, MemoryService
+from app.platforms.newsletter.services.memory import get_memory_service, MemoryService, CacheType
 from app.platforms.newsletter.agents.preference.llm import (
     get_preference_llm,
     get_analysis_config,
@@ -33,11 +33,6 @@ from app.platforms.newsletter.agents.preference.schemas import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Storage key patterns
-PREFERENCES_KEY = "preferences:{user_id}"
-ENGAGEMENT_KEY = "engagement:{user_id}"
-
 
 class PreferenceAgent(BaseAgent):
     """
@@ -131,10 +126,8 @@ class PreferenceAgent(BaseAgent):
         Returns:
             UserPreferences object (defaults if not found)
         """
-        key = PREFERENCES_KEY.format(user_id=user_id)
-
         try:
-            data = await self._memory_service.get(key)
+            data = await self._memory_service.get(user_id, CacheType.PREFERENCES, "settings")
             if data:
                 return UserPreferences.from_dict(data)
         except Exception as e:
@@ -176,8 +169,7 @@ class PreferenceAgent(BaseAgent):
         preferences.updated_at = datetime.now(timezone.utc)
 
         # Store updated preferences
-        key = PREFERENCES_KEY.format(user_id=user_id)
-        await self._memory_service.set(key, preferences.to_dict(), ttl=None)
+        await self._memory_service.set(user_id, CacheType.PREFERENCES, "settings", preferences.to_dict(), ttl=None)
 
         return preferences
 
@@ -344,9 +336,8 @@ class PreferenceAgent(BaseAgent):
         self, user_id: str, limit: int = 20
     ) -> List[Dict[str, Any]]:
         """Get recent engagement history for user."""
-        key = ENGAGEMENT_KEY.format(user_id=user_id)
         try:
-            data = await self._memory_service.get(key)
+            data = await self._memory_service.get(user_id, CacheType.ENGAGEMENT, "history")
             if data and isinstance(data, list):
                 return data[:limit]
         except Exception as e:
@@ -357,8 +348,6 @@ class PreferenceAgent(BaseAgent):
         self, user_id: str, engagement: EngagementData
     ) -> None:
         """Store engagement record in history."""
-        key = ENGAGEMENT_KEY.format(user_id=user_id)
-
         try:
             # Get existing history
             history = await self._get_engagement_history(user_id, limit=100)
@@ -370,7 +359,7 @@ class PreferenceAgent(BaseAgent):
             history = history[:100]
 
             # Store with no TTL (permanent)
-            await self._memory_service.set(key, history, ttl=None)
+            await self._memory_service.set(user_id, CacheType.ENGAGEMENT, "history", history, ttl=None)
 
         except Exception as e:
             logger.warning(f"Failed to store engagement: {e}")
@@ -420,8 +409,7 @@ class PreferenceAgent(BaseAgent):
 
             # Save updates
             preferences.updated_at = datetime.now(timezone.utc)
-            key = PREFERENCES_KEY.format(user_id=user_id)
-            await self._memory_service.set(key, preferences.to_dict(), ttl=None)
+            await self._memory_service.set(user_id, CacheType.PREFERENCES, "settings", preferences.to_dict(), ttl=None)
 
         except Exception as e:
             logger.warning(f"Failed to apply learned update: {e}")

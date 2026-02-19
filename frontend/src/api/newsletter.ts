@@ -194,11 +194,19 @@ export const newsletterApi = {
     return response.data;
   },
 
-  getCheckpoint: async (workflowId: string): Promise<Checkpoint> => {
-    const response = await apiClient.get<Checkpoint>(
-      `${BASE_PATH}/workflows/${workflowId}/checkpoint`
-    );
-    return response.data;
+  getCheckpoint: async (workflowId: string): Promise<Checkpoint | null> => {
+    try {
+      const response = await apiClient.get<Checkpoint>(
+        `${BASE_PATH}/workflows/${workflowId}/checkpoint`
+      );
+      return response.data;
+    } catch (error: any) {
+      // 404 means no active checkpoint (workflow completed or between steps)
+      if (error?.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
   },
 
   approveCheckpoint: async (
@@ -207,7 +215,8 @@ export const newsletterApi = {
   ): Promise<WorkflowState> => {
     const response = await apiClient.post<WorkflowState>(
       `${BASE_PATH}/workflows/${workflowId}/approve`,
-      request
+      request,
+      { timeout: TIMEOUTS.GENERATION }
     );
     return response.data;
   },
@@ -218,7 +227,8 @@ export const newsletterApi = {
   ): Promise<WorkflowState> => {
     const response = await apiClient.post<WorkflowState>(
       `${BASE_PATH}/workflows/${workflowId}/edit`,
-      request
+      request,
+      { timeout: TIMEOUTS.GENERATION }
     );
     return response.data;
   },
@@ -229,7 +239,8 @@ export const newsletterApi = {
   ): Promise<WorkflowState> => {
     const response = await apiClient.post<WorkflowState>(
       `${BASE_PATH}/workflows/${workflowId}/reject`,
-      request
+      request,
+      { timeout: TIMEOUTS.GENERATION }
     );
     return response.data;
   },

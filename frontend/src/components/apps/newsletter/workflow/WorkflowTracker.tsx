@@ -21,6 +21,7 @@ export const WORKFLOW_STEPS: WorkflowStep[] = [
   { id: 'research_review', label: 'Review Articles', description: 'Select and reorder articles' },
   { id: 'writing', label: 'Generate', description: 'Create newsletter content' },
   { id: 'content_review', label: 'Review Content', description: 'Edit and approve content' },
+  { id: 'subject_review', label: 'Select Subject', description: 'Choose a subject line' },
   { id: 'final_review', label: 'Final Review', description: 'Confirm and schedule' },
 ];
 
@@ -37,16 +38,21 @@ export function WorkflowTracker({
   status,
   className,
 }: WorkflowTrackerProps) {
+  const currentStepIndex = WORKFLOW_STEPS.findIndex((s) => s.id === currentStep);
+
   const getStepStatus = (stepId: string): 'completed' | 'current' | 'pending' | 'error' => {
+    // When workflow is completed, all steps are done
+    if (status === 'completed') return 'completed';
     if (completedSteps.includes(stepId)) return 'completed';
+    // All steps before the current step are implicitly completed
+    const stepIndex = WORKFLOW_STEPS.findIndex((s) => s.id === stepId);
+    if (currentStepIndex >= 0 && stepIndex >= 0 && stepIndex < currentStepIndex) return 'completed';
     if (currentStep === stepId) {
       if (status === 'failed') return 'error';
       return 'current';
     }
     return 'pending';
   };
-
-  const currentStepIndex = WORKFLOW_STEPS.findIndex((s) => s.id === currentStep);
 
   return (
     <div className={cn('w-full', className)}>
@@ -59,7 +65,7 @@ export function WorkflowTracker({
         <div
           className="absolute left-0 top-1/2 h-0.5 -translate-y-1/2 bg-primary transition-all duration-500"
           style={{
-            width: `${Math.max(0, (currentStepIndex / (WORKFLOW_STEPS.length - 1)) * 100)}%`,
+            width: `${status === 'completed' ? 100 : Math.max(0, (currentStepIndex / (WORKFLOW_STEPS.length - 1)) * 100)}%`,
           }}
         />
 
@@ -141,8 +147,8 @@ export function WorkflowTrackerCompact({
       {/* Progress indicator */}
       <div className="flex items-center gap-1">
         {WORKFLOW_STEPS.map((step) => {
-          const isCompleted = completedSteps.includes(step.id);
-          const isCurrent = step.id === currentStep;
+          const isCompleted = status === 'completed' || completedSteps.includes(step.id);
+          const isCurrent = status !== 'completed' && step.id === currentStep;
 
           return (
             <div

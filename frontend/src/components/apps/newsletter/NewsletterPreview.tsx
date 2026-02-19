@@ -145,10 +145,14 @@ function FormatTabs({ formats }: { formats: { html: string; text: string; markdo
               <Download className="h-3 w-3" />
             </Button>
           </div>
-          <div
-            className="border rounded-md p-4 bg-white min-h-[300px] max-h-[500px] overflow-auto prose prose-sm max-w-none"
-            dangerouslySetInnerHTML={{ __html: formats.html }}
-          />
+          <div className="border rounded-md bg-white min-h-[300px] max-h-[500px] overflow-auto">
+            <iframe
+              srcDoc={formats.html}
+              title="Newsletter HTML preview"
+              className="w-full h-[500px] border-0"
+              sandbox="allow-same-origin"
+            />
+          </div>
         </div>
       </TabsContent>
 
