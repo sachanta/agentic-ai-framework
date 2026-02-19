@@ -21,6 +21,7 @@ export const ROUTES = {
   NEWSLETTER_ANALYTICS: '/apps/newsletter/analytics',
   NEWSLETTER_WORKFLOW: '/apps/newsletter/workflow/:id',
   AGENTS: '/agents',
+  STUDIO: '/studio',
   AGENT_DETAIL: '/agents/:id',
   TOOLS: '/tools',
   TOOL_DETAIL: '/tools/:id',

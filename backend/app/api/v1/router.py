@@ -15,6 +15,7 @@ from app.api.v1.endpoints import (
     settings,
     weaviate,
     mongodb,
+    studio,
 )
 
 # Platform routers
@@ -35,6 +36,7 @@ api_router.include_router(logs.router, prefix="/logs", tags=["logs"])
 api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
 api_router.include_router(weaviate.router, prefix="/weaviate", tags=["weaviate"])
 api_router.include_router(mongodb.router, prefix="/mongodb", tags=["mongodb"])
+api_router.include_router(studio.router, prefix="/studio", tags=["studio"])
 
 # Platform-specific endpoints
 api_router.include_router(

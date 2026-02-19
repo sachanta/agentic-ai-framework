@@ -23,6 +23,7 @@ import {
   WorkflowPage,
 } from '@/pages/newsletter';
 import AgentsPage from '@/pages/AgentsPage';
+import StudioPage from '@/pages/StudioPage';
 import AgentDetailPage from '@/pages/AgentDetailPage';
 import ToolsPage from '@/pages/ToolsPage';
 import ToolDetailPage from '@/pages/ToolDetailPage';
@@ -78,6 +79,7 @@ function App() {
               <Route path={ROUTES.NEWSLETTER_WORKFLOW} element={<WorkflowPage />} />
               <Route path={ROUTES.APP_DETAIL} element={<AppDetailPage />} />
               <Route path={ROUTES.AGENTS} element={<AgentsPage />} />
+              <Route path={ROUTES.STUDIO} element={<StudioPage />} />
               <Route path="/agents/:id" element={<AgentDetailPage />} />
               <Route path={ROUTES.TOOLS} element={<ToolsPage />} />
               <Route path="/tools/:id" element={<ToolDetailPage />} />
