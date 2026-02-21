@@ -22,6 +22,7 @@ export const ROUTES = {
   NEWSLETTER_WORKFLOW: '/apps/newsletter/workflow/:id',
   AGENTS: '/agents',
   STUDIO: '/studio',
+  STUDIO_INSPECTOR: '/studio/:platformId/:agentName',
   AGENT_DETAIL: '/agents/:id',
   TOOLS: '/tools',
   TOOL_DETAIL: '/tools/:id',

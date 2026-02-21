@@ -58,3 +58,49 @@ export interface StudioPlatformsListResponse {
   platforms: StudioPlatformSummary[];
   total: number;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 2 — Inspector & Live Configuration
+// ---------------------------------------------------------------------------
+
+/** Request to update agent LLM config (session-only). */
+export interface StudioConfigUpdateRequest {
+  provider?: string;
+  model?: string;
+  temperature?: number;
+  max_tokens?: number;
+}
+
+/** Request to update agent system prompt (session-only). */
+export interface StudioPromptUpdateRequest {
+  system_prompt: string;
+}
+
+/** Request to run an agent with ad-hoc input. */
+export interface StudioTryRequest {
+  input: Record<string, unknown>;
+  config_override?: StudioConfigUpdateRequest;
+}
+
+/** Response from running an agent. */
+export interface StudioTryResponse {
+  success: boolean;
+  output?: Record<string, unknown>;
+  error?: string;
+  duration_ms: number;
+  agent_id: string;
+}
+
+/** LLM provider metadata. */
+export interface StudioProviderInfo {
+  name: string;
+  provider_type: string;
+  models: string[];
+  available: boolean;
+}
+
+/** Response for GET /studio/providers. */
+export interface StudioProvidersListResponse {
+  providers: StudioProviderInfo[];
+  total: number;
+}

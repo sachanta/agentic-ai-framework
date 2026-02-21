@@ -1,22 +1,25 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FlaskConical } from 'lucide-react';
 import { useStudioAgents } from '@/hooks/useStudio';
 import { PlatformFilter } from '@/components/studio/PlatformFilter';
 import { AgentCatalogGrid } from '@/components/studio/AgentCatalogGrid';
-import { AgentDetailDrawer } from '@/components/studio/AgentDetailDrawer';
 import type { StudioAgentSummary } from '@/types/studio';
 
 export function StudioPage() {
+  const navigate = useNavigate();
   const [selectedPlatform, setSelectedPlatform] = useState<
     string | undefined
   >(undefined);
-  const [selectedAgent, setSelectedAgent] =
-    useState<StudioAgentSummary | null>(null);
 
   const { data, isLoading } = useStudioAgents(selectedPlatform);
 
   const agents = data?.agents ?? [];
   const platforms = data?.platforms ?? [];
+
+  const handleSelectAgent = (agent: StudioAgentSummary) => {
+    navigate(`/studio/${agent.platform_id}/${agent.name}`);
+  };
 
   return (
     <div className="space-y-6">
@@ -40,13 +43,7 @@ export function StudioPage() {
       <AgentCatalogGrid
         agents={agents}
         isLoading={isLoading}
-        onSelectAgent={setSelectedAgent}
-      />
-
-      <AgentDetailDrawer
-        agent={selectedAgent}
-        open={selectedAgent !== null}
-        onClose={() => setSelectedAgent(null)}
+        onSelectAgent={handleSelectAgent}
       />
     </div>
   );

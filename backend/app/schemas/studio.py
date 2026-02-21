@@ -64,3 +64,50 @@ class StudioPlatformsListResponse(BaseModel):
     """Response for GET /studio/platforms."""
     platforms: List[StudioPlatformSummary]
     total: int
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Inspector & Live Configuration
+# ---------------------------------------------------------------------------
+
+
+class StudioConfigUpdateRequest(BaseModel):
+    """Request to update agent LLM config (session-only)."""
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    temperature: Optional[float] = None
+    max_tokens: Optional[int] = None
+
+
+class StudioPromptUpdateRequest(BaseModel):
+    """Request to update agent system prompt (session-only)."""
+    system_prompt: str
+
+
+class StudioTryRequest(BaseModel):
+    """Request to run an agent with ad-hoc input."""
+    input: Dict[str, Any]
+    config_override: Optional[StudioConfigUpdateRequest] = None
+
+
+class StudioTryResponse(BaseModel):
+    """Response from running an agent."""
+    success: bool
+    output: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+    duration_ms: float
+    agent_id: str
+
+
+class StudioProviderInfo(BaseModel):
+    """LLM provider metadata."""
+    name: str
+    provider_type: str
+    models: List[str] = []
+    available: bool
+
+
+class StudioProvidersListResponse(BaseModel):
+    """Response for GET /studio/providers."""
+    providers: List[StudioProviderInfo]
+    total: int

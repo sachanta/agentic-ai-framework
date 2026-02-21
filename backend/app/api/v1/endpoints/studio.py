@@ -3,23 +3,35 @@ Agent Studio endpoints — Discover agents across all platforms.
 
 These endpoints introspect the PlatformRegistry and BaseAgent instances
 to provide rich metadata for the Agent Studio UI.
+
+Phase 2 adds live configuration (session-only), prompt editing, agent
+execution ("Try It"), and LLM provider discovery.
 """
+import asyncio
 import importlib
 import logging
-from typing import Dict, List, Optional, Tuple
+import time
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, HTTPException, status
 
 from app.common.base.agent import BaseAgent
+from app.common.providers.llm import LLMProviderType, get_llm_provider
 from app.platforms.registry import PlatformInfo, get_platform_registry
 from app.schemas.studio import (
     StudioAgentDetail,
     StudioAgentSummary,
     StudioAgentsListResponse,
+    StudioConfigUpdateRequest,
     StudioLLMConfig,
     StudioPlatformSummary,
     StudioPlatformsListResponse,
+    StudioPromptUpdateRequest,
+    StudioProviderInfo,
+    StudioProvidersListResponse,
     StudioToolInfo,
+    StudioTryRequest,
+    StudioTryResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,6 +54,42 @@ _AGENT_FACTORIES: Dict[Tuple[str, str], str] = {
     ("newsletter", "preference"): "app.platforms.newsletter.agents:PreferenceAgent",
     ("newsletter", "custom_prompt"): "app.platforms.newsletter.agents:CustomPromptAgent",
 }
+
+
+# ---------------------------------------------------------------------------
+# Session-only override store (resets on server restart)
+# ---------------------------------------------------------------------------
+
+_session_overrides: Dict[str, Dict[str, Any]] = {}
+
+
+def _apply_overrides(agent: BaseAgent, agent_id: str) -> BaseAgent:
+    """Apply stored session overrides to an agent instance."""
+    overrides = _session_overrides.get(agent_id)
+    if not overrides:
+        return agent
+
+    if "temperature" in overrides:
+        agent.temperature = overrides["temperature"]
+    if "max_tokens" in overrides:
+        agent.max_tokens = overrides["max_tokens"]
+    if "model" in overrides:
+        agent.model = overrides["model"]
+    if "system_prompt" in overrides:
+        agent.system_prompt = overrides["system_prompt"]
+    if "provider" in overrides:
+        try:
+            provider_type = LLMProviderType(overrides["provider"])
+            agent._llm = get_llm_provider(provider_type)
+        except (ValueError, Exception) as e:
+            logger.warning(f"Could not apply provider override '{overrides['provider']}': {e}")
+
+    return agent
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 
 def _import_agent_class(import_path: str):
@@ -173,6 +221,41 @@ def _discover_agent(
     return None
 
 
+def _discover_and_apply(platform_id: str, agent_name: str) -> Tuple[BaseAgent, PlatformInfo]:
+    """Discover an agent and apply session overrides. Returns (agent, platform_info)."""
+    registry = get_platform_registry()
+    platform_info = registry.get(platform_id)
+
+    if not platform_info:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Platform '{platform_id}' not found",
+        )
+
+    if agent_name not in platform_info.agents:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Agent '{agent_name}' not found in platform '{platform_id}'",
+        )
+
+    orchestrator = None
+    try:
+        orchestrator = registry.create_orchestrator(platform_id)
+    except Exception as e:
+        logger.warning(f"Could not create orchestrator for {platform_id}: {e}")
+
+    agent = _discover_agent(platform_info, agent_name, orchestrator)
+    if not agent:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Agent '{agent_name}' could not be instantiated",
+        )
+
+    agent_id = f"{platform_id}/{agent_name}"
+    _apply_overrides(agent, agent_id)
+    return agent, platform_info
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -216,6 +299,8 @@ async def list_studio_agents(platform_id: Optional[str] = None):
         for agent_name in platform_info.agents:
             agent = _discover_agent(platform_info, agent_name, orchestrator)
             if agent:
+                agent_id = f"{platform_info.id}/{agent_name}"
+                _apply_overrides(agent, agent_id)
                 summary = _build_agent_summary(agent, platform_info)
                 all_agents.append(summary)
                 discovered_names.append(agent_name)
@@ -253,37 +338,171 @@ async def get_studio_agent(platform_id: str, agent_name: str):
     Get detailed agent metadata by platform and name.
 
     Returns full introspection data including system prompt, tools,
-    and parameters.
+    and parameters.  Session overrides are applied before returning.
     """
-    registry = get_platform_registry()
-    platform_info = registry.get(platform_id)
-
-    if not platform_info:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Platform '{platform_id}' not found",
-        )
-
-    if agent_name not in platform_info.agents:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Agent '{agent_name}' not found in platform '{platform_id}'",
-        )
-
-    orchestrator = None
-    try:
-        orchestrator = registry.create_orchestrator(platform_id)
-    except Exception as e:
-        logger.warning(f"Could not create orchestrator for {platform_id}: {e}")
-
-    agent = _discover_agent(platform_info, agent_name, orchestrator)
-    if not agent:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Agent '{agent_name}' could not be instantiated",
-        )
-
+    agent, platform_info = _discover_and_apply(platform_id, agent_name)
     return _build_agent_detail(agent, platform_info)
+
+
+@router.patch(
+    "/agents/{platform_id}/{agent_name}/config",
+    response_model=StudioAgentDetail,
+)
+async def update_agent_config(
+    platform_id: str,
+    agent_name: str,
+    request: StudioConfigUpdateRequest,
+):
+    """
+    Update agent LLM config (session-only, resets on server restart).
+
+    Merges the provided fields into the session override store and
+    returns the updated agent detail.
+    """
+    agent_id = f"{platform_id}/{agent_name}"
+
+    # Merge new values into existing overrides
+    overrides = _session_overrides.setdefault(agent_id, {})
+    update = request.model_dump(exclude_none=True)
+    overrides.update(update)
+
+    agent, platform_info = _discover_and_apply(platform_id, agent_name)
+    return _build_agent_detail(agent, platform_info)
+
+
+@router.put(
+    "/agents/{platform_id}/{agent_name}/prompt",
+    response_model=StudioAgentDetail,
+)
+async def update_agent_prompt(
+    platform_id: str,
+    agent_name: str,
+    request: StudioPromptUpdateRequest,
+):
+    """
+    Update agent system prompt (session-only, resets on server restart).
+    """
+    agent_id = f"{platform_id}/{agent_name}"
+
+    overrides = _session_overrides.setdefault(agent_id, {})
+    overrides["system_prompt"] = request.system_prompt
+
+    agent, platform_info = _discover_and_apply(platform_id, agent_name)
+    return _build_agent_detail(agent, platform_info)
+
+
+@router.post(
+    "/agents/{platform_id}/{agent_name}/try",
+    response_model=StudioTryResponse,
+)
+async def try_agent(
+    platform_id: str,
+    agent_name: str,
+    request: StudioTryRequest,
+):
+    """
+    Execute an agent with ad-hoc input and return the result.
+
+    Applies session overrides + optional per-request config_override.
+    Times out after 60 seconds.
+    """
+    agent, platform_info = _discover_and_apply(platform_id, agent_name)
+    agent_id = f"{platform_id}/{agent_name}"
+
+    # Apply per-request config overrides (temporary, not persisted)
+    if request.config_override:
+        co = request.config_override
+        if co.temperature is not None:
+            agent.temperature = co.temperature
+        if co.max_tokens is not None:
+            agent.max_tokens = co.max_tokens
+        if co.model is not None:
+            agent.model = co.model
+        if co.provider is not None:
+            try:
+                provider_type = LLMProviderType(co.provider)
+                agent._llm = get_llm_provider(provider_type)
+            except (ValueError, Exception):
+                pass
+
+    start = time.perf_counter()
+    try:
+        result = await asyncio.wait_for(agent.run(request.input), timeout=60)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        return StudioTryResponse(
+            success=True,
+            output=result,
+            duration_ms=round(elapsed_ms, 1),
+            agent_id=agent_id,
+        )
+    except asyncio.TimeoutError:
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        return StudioTryResponse(
+            success=False,
+            error="Agent execution timed out after 60 seconds",
+            duration_ms=round(elapsed_ms, 1),
+            agent_id=agent_id,
+        )
+    except Exception as e:
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        return StudioTryResponse(
+            success=False,
+            error=str(e),
+            duration_ms=round(elapsed_ms, 1),
+            agent_id=agent_id,
+        )
+
+
+@router.delete(
+    "/agents/{platform_id}/{agent_name}/config",
+    response_model=StudioAgentDetail,
+)
+async def reset_agent_config(platform_id: str, agent_name: str):
+    """
+    Reset all session overrides for an agent back to defaults.
+    """
+    agent_id = f"{platform_id}/{agent_name}"
+    _session_overrides.pop(agent_id, None)
+
+    agent, platform_info = _discover_and_apply(platform_id, agent_name)
+    return _build_agent_detail(agent, platform_info)
+
+
+@router.get("/providers", response_model=StudioProvidersListResponse)
+async def list_providers():
+    """
+    List all LLM providers with their available models.
+
+    Iterates the LLMProviderType enum and attempts to instantiate each
+    provider.  Gracefully handles missing API keys / unreachable services.
+    """
+    providers: List[StudioProviderInfo] = []
+
+    for pt in LLMProviderType:
+        info = StudioProviderInfo(
+            name=pt.name.replace("_", " ").title(),
+            provider_type=pt.value,
+            models=[],
+            available=False,
+        )
+        try:
+            provider = get_llm_provider(pt)
+            healthy = await provider.health_check()
+            if healthy:
+                info.available = True
+                info.models = await provider.list_models()
+            else:
+                # Still try to list models even if health check fails
+                info.models = await provider.list_models()
+        except Exception as e:
+            logger.debug(f"Provider {pt.value} not available: {e}")
+
+        providers.append(info)
+
+    return StudioProvidersListResponse(
+        providers=providers,
+        total=len(providers),
+    )
 
 
 @router.get("/platforms", response_model=StudioPlatformsListResponse)
