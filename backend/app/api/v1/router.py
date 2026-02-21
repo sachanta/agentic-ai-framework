@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     platforms,
     agents,
     tools,
+    tools_studio,
     workflows,
     executions,
     logs,
@@ -37,6 +38,7 @@ api_router.include_router(settings.router, prefix="/settings", tags=["settings"]
 api_router.include_router(weaviate.router, prefix="/weaviate", tags=["weaviate"])
 api_router.include_router(mongodb.router, prefix="/mongodb", tags=["mongodb"])
 api_router.include_router(studio.router, prefix="/studio", tags=["studio"])
+api_router.include_router(tools_studio.router, prefix="/tools-studio", tags=["tools-studio"])
 
 # Platform-specific endpoints
 api_router.include_router(

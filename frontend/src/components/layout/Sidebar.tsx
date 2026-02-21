@@ -32,9 +32,8 @@ interface NavItem {
 const mainNavItems: NavItem[] = [
   { title: 'Dashboard', href: ROUTES.DASHBOARD, icon: LayoutDashboard },
   { title: 'Apps', href: ROUTES.APPS, icon: Boxes },
-  { title: 'Agents', href: ROUTES.AGENTS, icon: Bot },
-  { title: 'Studio', href: ROUTES.STUDIO, icon: FlaskConical },
-  { title: 'Tools', href: ROUTES.TOOLS, icon: Wrench },
+  { title: 'Agent Studio', href: ROUTES.STUDIO, icon: FlaskConical },
+  { title: 'Tools Studio', href: ROUTES.TOOLS, icon: Wrench },
   { title: 'Workflows', href: ROUTES.WORKFLOWS, icon: GitBranch },
   { title: 'Executions', href: ROUTES.EXECUTIONS, icon: Play },
   { title: 'Logs', href: ROUTES.LOGS, icon: FileText },

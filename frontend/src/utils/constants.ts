@@ -25,6 +25,7 @@ export const ROUTES = {
   STUDIO_INSPECTOR: '/studio/:platformId/:agentName',
   AGENT_DETAIL: '/agents/:id',
   TOOLS: '/tools',
+  TOOLS_INSPECTOR: '/tools/:toolId',
   TOOL_DETAIL: '/tools/:id',
   WORKFLOWS: '/workflows',
   WORKFLOW_BUILDER: '/workflows/:id',

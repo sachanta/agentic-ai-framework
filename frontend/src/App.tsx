@@ -27,6 +27,7 @@ import StudioPage from '@/pages/StudioPage';
 import AgentInspectorPage from '@/pages/AgentInspectorPage';
 import AgentDetailPage from '@/pages/AgentDetailPage';
 import ToolsPage from '@/pages/ToolsPage';
+import ToolInspectorPage from '@/pages/ToolInspectorPage';
 import ToolDetailPage from '@/pages/ToolDetailPage';
 import WorkflowsPage from '@/pages/WorkflowsPage';
 import WorkflowBuilderPage from '@/pages/WorkflowBuilderPage';
@@ -84,6 +85,7 @@ function App() {
               <Route path={ROUTES.STUDIO_INSPECTOR} element={<AgentInspectorPage />} />
               <Route path="/agents/:id" element={<AgentDetailPage />} />
               <Route path={ROUTES.TOOLS} element={<ToolsPage />} />
+              <Route path={ROUTES.TOOLS_INSPECTOR} element={<ToolInspectorPage />} />
               <Route path="/tools/:id" element={<ToolDetailPage />} />
               <Route path={ROUTES.WORKFLOWS} element={<WorkflowsPage />} />
               <Route path="/workflows/:id" element={<WorkflowBuilderPage />} />

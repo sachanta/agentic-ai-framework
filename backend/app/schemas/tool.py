@@ -1,7 +1,7 @@
 """
 Tool schemas.
 """
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 
 
@@ -42,3 +42,64 @@ class ToolResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---------------------------------------------------------------------------
+# Tools Studio schemas
+# ---------------------------------------------------------------------------
+
+
+class ToolStudioParameter(BaseModel):
+    """Schema for a single tool parameter."""
+
+    name: str
+    type: str
+    description: str
+    required: bool = True
+    default: Optional[Any] = None
+
+
+class ToolStudioSummary(BaseModel):
+    """Lightweight summary for catalog grid cards."""
+
+    tool_id: str
+    name: str
+    display_name: str
+    category: str
+    platform_id: str
+    service_class: str
+    description: str
+    parameter_count: int
+    status: str = "available"
+
+
+class ToolStudioDetail(ToolStudioSummary):
+    """Full detail for inspector page."""
+
+    parameters: List[ToolStudioParameter] = []
+    returns: Optional[str] = None
+    requires: List[str] = []
+
+
+class ToolStudioListResponse(BaseModel):
+    """Response for listing tools."""
+
+    tools: List[ToolStudioSummary]
+    total: int
+    categories: List[str]
+
+
+class ToolStudioTryRequest(BaseModel):
+    """Request body for trying a tool."""
+
+    parameters: Dict[str, Any] = {}
+
+
+class ToolStudioTryResponse(BaseModel):
+    """Response from tool execution."""
+
+    success: bool
+    output: Optional[Any] = None
+    error: Optional[str] = None
+    duration_ms: float
+    tool_id: str
