@@ -1,8 +1,20 @@
 """
 Application configuration settings.
 """
+import logging
+import re
 from typing import List
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+_INSECURE_SECRET_KEY_DEFAULTS = {
+    "your-secret-key-change-in-production",
+    "changeme",
+    "secret",
+    "",
+}
 
 
 class Settings(BaseSettings):
@@ -82,6 +94,29 @@ class Settings(BaseSettings):
     def CORS_ORIGINS(self) -> List[str]:
         """Parse CORS_ORIGINS from comma-separated string."""
         return [origin.strip() for origin in self.CORS_ORIGINS_STR.split(",") if origin.strip()]
+
+    def validate_secret_key(self) -> None:
+        """Validate that SECRET_KEY has been changed from the insecure default."""
+        if self.SECRET_KEY.lower().strip() in _INSECURE_SECRET_KEY_DEFAULTS:
+            raise RuntimeError(
+                "SECURITY ERROR: SECRET_KEY is set to an insecure default value. "
+                "Set a strong, unique SECRET_KEY via environment variable "
+                "before running in production."
+            )
+        if len(self.SECRET_KEY) < 32:
+            logger.warning(
+                "SECRET_KEY is shorter than 32 characters. "
+                "Consider using a longer key for better security."
+            )
+
+    @staticmethod
+    def sanitize_mongodb_uri(uri: str) -> str:
+        """Remove credentials from a MongoDB URI for safe logging."""
+        return re.sub(
+            r"://[^@]+@",
+            "://<credentials>@",
+            uri,
+        )
 
 
 settings = Settings()

@@ -24,7 +24,8 @@ async def connect_mongodb() -> None:
     """
     global client, database
 
-    logger.info(f"Connecting to MongoDB at {settings.MONGODB_URI}...")
+    safe_uri = settings.sanitize_mongodb_uri(settings.MONGODB_URI)
+    logger.info(f"Connecting to MongoDB at {safe_uri}...")
 
     try:
         client = AsyncIOMotorClient(
@@ -158,9 +159,16 @@ async def init_default_data() -> None:
     """
     Initialize default data in the database.
     Creates default admin user if not exists.
+
+    Admin credentials are read from environment variables:
+      - DEFAULT_ADMIN_PASSWORD (required for first-time setup)
+      - DEFAULT_ADMIN_EMAIL (optional, defaults to admin@example.com)
     """
     if database is None:
         return
+
+    import os
+    import secrets
 
     from app.core.security import get_password_hash
 
@@ -169,10 +177,25 @@ async def init_default_data() -> None:
     # Check if admin user exists
     admin = await users.find_one({"username": "admin"})
     if not admin:
+        admin_password = os.environ.get("DEFAULT_ADMIN_PASSWORD")
+        if not admin_password:
+            # Generate a random password and log it once for first-time setup
+            admin_password = secrets.token_urlsafe(16)
+            logger.warning(
+                "No DEFAULT_ADMIN_PASSWORD set. Generated random admin password. "
+                "Set DEFAULT_ADMIN_PASSWORD env var for deterministic setup."
+            )
+            logger.info(
+                "Generated admin password: %s "
+                "(change immediately after first login)",
+                admin_password,
+            )
+
+        admin_email = os.environ.get("DEFAULT_ADMIN_EMAIL", "admin@example.com")
         admin_user = {
             "username": "admin",
-            "email": "admin@example.com",
-            "hashed_password": get_password_hash("admin123"),
+            "email": admin_email,
+            "hashed_password": get_password_hash(admin_password),
             "role": "admin",
             "is_active": True,
             "status": "approved",
@@ -180,23 +203,7 @@ async def init_default_data() -> None:
             "created_at": time.time(),
         }
         await users.insert_one(admin_user)
-        logger.info("Created default admin user (admin/admin123)")
-
-    # Check if regular user exists
-    user = await users.find_one({"username": "user"})
-    if not user:
-        regular_user = {
-            "username": "user",
-            "email": "user@example.com",
-            "hashed_password": get_password_hash("user123"),
-            "role": "user",
-            "is_active": True,
-            "status": "approved",
-            "platforms": [],
-            "created_at": time.time(),
-        }
-        await users.insert_one(regular_user)
-        logger.info("Created default user (user/user123)")
+        logger.info("Created default admin user")
 
     # Backfill existing users with new fields (status, platforms)
     result = await users.update_many(

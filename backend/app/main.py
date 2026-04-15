@@ -10,8 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import api_router
 from app.config import settings
 from app.core.middleware import setup_middleware
-from app.db.mongodb import connect_mongodb, close_mongodb, init_default_data
-from app.db.weaviate import connect_weaviate, close_weaviate
+from app.db.mongodb import close_mongodb, connect_mongodb, init_default_data
+from app.db.weaviate import close_weaviate, connect_weaviate
 from app.platforms.hello_world import register_platform as register_hello_world
 from app.platforms.newsletter import register_platform as register_newsletter
 
@@ -32,6 +32,9 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info(f"Starting {settings.APP_NAME} v{settings.VERSION}")
+
+    # Validate SECRET_KEY is not the insecure default
+    settings.validate_secret_key()
 
     # Register platforms
     logger.info("Registering platforms...")
@@ -66,13 +69,14 @@ async def lifespan(app: FastAPI):
 
 
 # Create FastAPI application
+# Disable interactive API docs in production (when DEBUG=False)
 app = FastAPI(
     title=settings.APP_NAME,
     description="A framework for building multi-agent AI applications",
     version=settings.VERSION,
-    openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
-    docs_url=f"{settings.API_V1_PREFIX}/docs",
-    redoc_url=f"{settings.API_V1_PREFIX}/redoc",
+    openapi_url=f"{settings.API_V1_PREFIX}/openapi.json" if settings.DEBUG else None,
+    docs_url=f"{settings.API_V1_PREFIX}/docs" if settings.DEBUG else None,
+    redoc_url=f"{settings.API_V1_PREFIX}/redoc" if settings.DEBUG else None,
     lifespan=lifespan,
 )
 
@@ -81,8 +85,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
 
 # Setup custom middleware
