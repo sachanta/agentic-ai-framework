@@ -405,7 +405,7 @@ class UploadManager:
         }
 
     async def _ensure_rag_collection(self, client) -> None:
-        """Ensure RAG collection exists."""
+        """Ensure RAG collection exists with properly indexed properties."""
         collection_name = "RAGDocuments"
 
         if not client.collections.exists(collection_name):
@@ -416,12 +416,42 @@ class UploadManager:
                 description="Documents for RAG (Retrieval Augmented Generation)",
                 vectorizer_config=Configure.Vectorizer.none(),
                 properties=[
-                    Property(name="title", data_type=DataType.TEXT),
-                    Property(name="content", data_type=DataType.TEXT),
-                    Property(name="source", data_type=DataType.TEXT),
-                    Property(name="chunk_id", data_type=DataType.TEXT),
-                    Property(name="metadata_json", data_type=DataType.TEXT),
-                    Property(name="created_at", data_type=DataType.DATE),
+                    Property(
+                        name="title",
+                        data_type=DataType.TEXT,
+                        index_filterable=True,
+                        index_searchable=True,
+                    ),
+                    Property(
+                        name="content",
+                        data_type=DataType.TEXT,
+                        index_filterable=True,
+                        index_searchable=True,
+                    ),
+                    Property(
+                        name="source",
+                        data_type=DataType.TEXT,
+                        index_filterable=True,
+                        index_searchable=True,
+                    ),
+                    Property(
+                        name="chunk_id",
+                        data_type=DataType.TEXT,
+                        index_filterable=True,
+                        index_searchable=True,
+                    ),
+                    Property(
+                        name="metadata_json",
+                        data_type=DataType.TEXT,
+                        index_filterable=False,
+                        index_searchable=False,
+                    ),
+                    Property(
+                        name="created_at",
+                        data_type=DataType.DATE,
+                        index_filterable=True,
+                        index_searchable=False,
+                    ),
                 ],
             )
             logger.info(f"Created RAG collection: {collection_name}")

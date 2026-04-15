@@ -58,6 +58,8 @@ async def _ensure_indexes() -> None:
     users = database.users
     await users.create_index("username", unique=True)
     await users.create_index("email", unique=True)
+    await users.create_index("role")
+    await users.create_index("is_active")
 
     # Executions collection indexes
     executions = database.executions
@@ -70,6 +72,49 @@ async def _ensure_indexes() -> None:
     await logs.create_index([("timestamp", -1)])
     await logs.create_index("level")
     await logs.create_index("source")
+    await logs.create_index("platform_id")
+    await logs.create_index("agent_id")
+    await logs.create_index("execution_id")
+    await logs.create_index("trace_id")
+
+    # Settings collection indexes
+    settings = database.settings
+    await settings.create_index("category", unique=True)
+
+    # Agent executions collection indexes
+    agent_executions = database.agent_executions
+    await agent_executions.create_index("agent_name")
+    await agent_executions.create_index("platform_id")
+    await agent_executions.create_index("status")
+    await agent_executions.create_index([("created_at", -1)])
+    await agent_executions.create_index([("agent_name", 1), ("created_at", -1)])
+
+    # Conversations collection indexes
+    conversations = database.conversations
+    await conversations.create_index("session_id", unique=True)
+    await conversations.create_index([("created_at", -1)])
+
+    # Knowledge base collection indexes
+    knowledge_base = database.knowledge_base
+    await knowledge_base.create_index("source")
+    await knowledge_base.create_index("tags")
+    await knowledge_base.create_index([("created_at", -1)])
+    await knowledge_base.create_index(
+        [("title", "text"), ("content", "text")],
+        name="knowledge_base_text_search",
+    )
+
+    # Agent configs collection indexes
+    agent_configs = database.agent_configs
+    await agent_configs.create_index("agent_name", unique=True)
+
+    # Metrics collection indexes
+    metrics = database.metrics
+    await metrics.create_index([("timestamp", -1)])
+    await metrics.create_index("metric_type")
+    await metrics.create_index("agent_name")
+    await metrics.create_index("platform_id")
+    await metrics.create_index([("metric_type", 1), ("timestamp", -1)])
 
     logger.info("MongoDB indexes ensured")
 

@@ -144,42 +144,83 @@ async def get_weaviate_status() -> dict:
 
 async def ensure_collections() -> None:
     """
-    Ensure required Weaviate collections exist.
+    Ensure required Weaviate collections exist with properly indexed properties.
     """
     if _client is None:
         return
 
     try:
-        # Define collections to create
-        collections_config = [
-            {
-                "name": "Documents",
-                "description": "General document storage for RAG",
-                "properties": [
-                    {"name": "title", "data_type": "text"},
-                    {"name": "content", "data_type": "text"},
-                    {"name": "source", "data_type": "text"},
-                    {"name": "metadata", "data_type": "object"},
-                ],
-            },
-            {
-                "name": "AgentMemory",
-                "description": "Agent conversation and context memory",
-                "properties": [
-                    {"name": "agent_id", "data_type": "text"},
-                    {"name": "content", "data_type": "text"},
-                    {"name": "memory_type", "data_type": "text"},
-                    {"name": "timestamp", "data_type": "date"},
-                ],
-            },
-        ]
+        from weaviate.classes.config import Property, DataType, Configure
 
-        for config in collections_config:
-            collection_name = config["name"]
-            if not _client.collections.exists(collection_name):
-                logger.info(f"Creating Weaviate collection: {collection_name}")
-                # Collections will be created when needed
-                # Skipping automatic creation for now
+        # Documents collection
+        if not _client.collections.exists("Documents"):
+            logger.info("Creating Weaviate collection: Documents")
+            _client.collections.create(
+                name="Documents",
+                description="General document storage for RAG",
+                vectorizer_config=Configure.Vectorizer.none(),
+                properties=[
+                    Property(
+                        name="title",
+                        data_type=DataType.TEXT,
+                        index_filterable=True,
+                        index_searchable=True,
+                    ),
+                    Property(
+                        name="content",
+                        data_type=DataType.TEXT,
+                        index_filterable=True,
+                        index_searchable=True,
+                    ),
+                    Property(
+                        name="source",
+                        data_type=DataType.TEXT,
+                        index_filterable=True,
+                        index_searchable=True,
+                    ),
+                    Property(
+                        name="metadata",
+                        data_type=DataType.OBJECT,
+                        index_filterable=False,
+                        index_searchable=False,
+                    ),
+                ],
+            )
+
+        # AgentMemory collection
+        if not _client.collections.exists("AgentMemory"):
+            logger.info("Creating Weaviate collection: AgentMemory")
+            _client.collections.create(
+                name="AgentMemory",
+                description="Agent conversation and context memory",
+                vectorizer_config=Configure.Vectorizer.none(),
+                properties=[
+                    Property(
+                        name="agent_id",
+                        data_type=DataType.TEXT,
+                        index_filterable=True,
+                        index_searchable=True,
+                    ),
+                    Property(
+                        name="content",
+                        data_type=DataType.TEXT,
+                        index_filterable=True,
+                        index_searchable=True,
+                    ),
+                    Property(
+                        name="memory_type",
+                        data_type=DataType.TEXT,
+                        index_filterable=True,
+                        index_searchable=True,
+                    ),
+                    Property(
+                        name="timestamp",
+                        data_type=DataType.DATE,
+                        index_filterable=True,
+                        index_searchable=False,
+                    ),
+                ],
+            )
 
         logger.info("Weaviate collections verified")
 
