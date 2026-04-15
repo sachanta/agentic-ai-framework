@@ -2,7 +2,6 @@
 Authentication endpoints.
 """
 import logging
-from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -10,8 +9,9 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 
 from app.config import settings
+from app.core.sanitization import validate_password_strength
 from app.core.security import get_current_user, require_admin
-from app.services.auth import get_auth_service, AuthService
+from app.services.auth import AuthService, get_auth_service
 
 logger = logging.getLogger(__name__)
 
@@ -219,6 +219,9 @@ async def register(
     Creates the account in pending status. An approval email
     is sent to the admin. The user cannot log in until approved.
     """
+    # Validate password strength
+    validate_password_strength(request.password)
+
     # Validate platform IDs
     valid_platforms = [
         p.strip()
@@ -357,6 +360,9 @@ async def change_password(
 
     Requires the current password for verification.
     """
+    # Validate new password strength
+    validate_password_strength(request.new_password)
+
     success = await auth_service.change_password(
         user_id=current_user["id"],
         current_password=request.current_password,

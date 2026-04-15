@@ -23,6 +23,7 @@ from fastapi import APIRouter, HTTPException, Query, status, Body
 from pydantic import BaseModel, Field
 
 from app.db.mongodb import get_database, get_client, get_mongodb_status
+from app.core.sanitization import sanitize_query, sanitize_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -793,11 +794,14 @@ async def query_documents(name: str, request: QueryRequest):
 
         collection = db[name]
 
+        # Sanitize filter to prevent NoSQL injection
+        safe_filter = sanitize_query(request.filter)
+
         # Get total count for the filter
-        total = await collection.count_documents(request.filter)
+        total = await collection.count_documents(safe_filter)
 
         # Build query
-        cursor = collection.find(request.filter, request.projection)
+        cursor = collection.find(safe_filter, request.projection)
 
         if request.sort:
             sort_list = [(k, v) for k, v in request.sort.items()]
@@ -837,7 +841,10 @@ async def aggregate_documents(name: str, request: AggregationRequest):
             )
 
         collection = db[name]
-        cursor = collection.aggregate(request.pipeline)
+
+        # Sanitize pipeline to prevent NoSQL injection
+        safe_pipeline = sanitize_pipeline(request.pipeline)
+        cursor = collection.aggregate(safe_pipeline)
         results = await cursor.to_list(length=1000)
 
         return {
