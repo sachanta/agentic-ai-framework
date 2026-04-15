@@ -232,3 +232,39 @@ def require_role(required_role: str):
         return current_user
 
     return check_role
+
+
+def require_platform(platform_id: str):
+    """
+    Factory for platform-based access control dependency.
+
+    Checks if the current user has access to a specific platform.
+    Admin users always have access. Users with an empty platforms
+    list have unrestricted access (backward compatibility).
+
+    Args:
+        platform_id: The platform ID to check access for
+
+    Returns:
+        A dependency function that checks platform access
+    """
+    async def check_platform(current_user: dict = Depends(get_current_user)) -> dict:
+        # Admin always has access
+        if current_user.get("role") == "admin":
+            return current_user
+
+        user_platforms = current_user.get("platforms", [])
+
+        # Empty list = unrestricted (backward compat for existing users)
+        if not user_platforms:
+            return current_user
+
+        if platform_id not in user_platforms:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You don't have access to the {platform_id} platform",
+            )
+
+        return current_user
+
+    return check_platform

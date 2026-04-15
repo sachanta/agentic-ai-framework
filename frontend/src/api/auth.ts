@@ -1,10 +1,15 @@
 import apiClient from './client';
-import type { User, LoginCredentials, LoginResponse } from '@/types/auth';
+import type { User, LoginCredentials, LoginResponse, RegisterRequest, RegisterResponse } from '@/types/auth';
 
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
     // Use /login/json endpoint which accepts JSON body
     const response = await apiClient.post<LoginResponse>('/api/v1/auth/login/json', credentials);
+    return response.data;
+  },
+
+  register: async (data: RegisterRequest): Promise<RegisterResponse> => {
+    const response = await apiClient.post<RegisterResponse>('/api/v1/auth/register', data);
     return response.data;
   },
 

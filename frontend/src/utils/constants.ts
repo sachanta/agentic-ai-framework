@@ -9,6 +9,7 @@ export const USER_KEY = 'auth_user';
 
 export const ROUTES = {
   LOGIN: '/login',
+  SIGNUP: '/signup',
   DASHBOARD: '/',
   APPS: '/apps',
   APP_DETAIL: '/apps/:appId',
@@ -45,7 +46,7 @@ export const ROLE_PERMISSIONS = {
   user: ['read'],
 } as const;
 
-export const PUBLIC_ROUTES = [ROUTES.LOGIN];
+export const PUBLIC_ROUTES = [ROUTES.LOGIN, ROUTES.SIGNUP];
 
 export const ADMIN_ROUTES = [
   ROUTES.DATA,

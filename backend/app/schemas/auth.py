@@ -1,7 +1,7 @@
 """
 Authentication schemas.
 """
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, EmailStr
 
 
@@ -14,12 +14,13 @@ class Token(BaseModel):
 
 
 class UserCreate(BaseModel):
-    """Schema for creating a user."""
+    """Schema for creating a user (admin use)."""
 
     username: str
     email: EmailStr
     password: str
     role: str = "user"
+    platforms: List[str] = []
 
 
 class UserResponse(BaseModel):
@@ -30,6 +31,8 @@ class UserResponse(BaseModel):
     email: str
     role: str
     is_active: bool
+    status: str = "approved"
+    platforms: List[str] = []
     created_at: str
 
     class Config:

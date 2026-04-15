@@ -91,6 +91,15 @@ setup_middleware(app)
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
+# Mount MCP SSE server (graceful degradation if mcp not installed)
+try:
+    from app.mcp.sse import create_mcp_sse_app
+
+    app.mount("/mcp", create_mcp_sse_app())
+    logger.info("MCP SSE server mounted at /mcp")
+except ImportError:
+    logger.info("MCP package not installed — MCP SSE endpoint disabled")
+
 
 @app.get("/")
 async def root():

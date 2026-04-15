@@ -64,6 +64,17 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: str | None = None
     AWS_BEDROCK_MODEL: str = "anthropic.claude-v2"
 
+    # System Email (Resend)
+    RESEND_API_KEY: str | None = None
+    SYSTEM_FROM_EMAIL: str = "noreply@example.com"
+    SYSTEM_FROM_NAME: str = "Agentic AI Framework"
+
+    # Signup & Approval
+    SIGNUP_APPROVAL_EMAIL: str = "achantas@gmail.com"
+    APP_BASE_URL: str = "http://localhost:8000"
+    SIGNUP_APPROVAL_TOKEN_EXPIRY_DAYS: int = 7
+    SIGNUP_AVAILABLE_PLATFORMS: str = "newsletter,hello_world"
+
     # Logging
     LOG_LEVEL: str = "INFO"
 

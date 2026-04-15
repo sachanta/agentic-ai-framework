@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "agentic-ai-framework": {
+      "command": "python",
+      "args": ["-m", "app.mcp"],
+      "cwd": "./backend"
+    }
+  }
+}

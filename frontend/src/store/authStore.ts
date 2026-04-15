@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User, UserRole, LoginCredentials } from '@/types/auth';
+import type { User, UserRole, LoginCredentials, RegisterRequest, RegisterResponse } from '@/types/auth';
 import { authApi } from '@/api/auth';
 import { clearAuthStorage, setStoredToken, setStoredUser } from '@/utils/auth';
 
@@ -11,6 +11,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   login: (credentials: LoginCredentials) => Promise<void>;
+  register: (data: RegisterRequest) => Promise<RegisterResponse>;
   logout: () => void;
   checkAuth: () => Promise<void>;
   clearError: () => void;
@@ -41,6 +42,19 @@ export const useAuthStore = create<AuthState>()(
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Login failed';
+          set({ error: message, isLoading: false });
+          throw error;
+        }
+      },
+
+      register: async (data: RegisterRequest) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await authApi.register(data);
+          set({ isLoading: false });
+          return response;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Registration failed';
           set({ error: message, isLoading: false });
           throw error;
         }

@@ -1,4 +1,5 @@
 export type UserRole = 'admin' | 'user';
+export type UserStatus = 'pending' | 'approved' | 'rejected';
 
 export interface User {
   id: string;
@@ -6,6 +7,8 @@ export interface User {
   email: string;
   role: UserRole;
   is_active: boolean;
+  status: UserStatus;
+  platforms: string[];
   createdAt?: string;
   lastLogin?: string;
 }
@@ -20,6 +23,17 @@ export interface LoginResponse {
   token_type: string;
   expires_in: number;
   user: User;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  platforms: string[];
+}
+
+export interface RegisterResponse {
+  message: string;
+  status: UserStatus;
 }
 
 export interface AuthState {

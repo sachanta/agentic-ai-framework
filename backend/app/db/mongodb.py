@@ -175,6 +175,8 @@ async def init_default_data() -> None:
             "hashed_password": get_password_hash("admin123"),
             "role": "admin",
             "is_active": True,
+            "status": "approved",
+            "platforms": [],
             "created_at": time.time(),
         }
         await users.insert_one(admin_user)
@@ -189,7 +191,17 @@ async def init_default_data() -> None:
             "hashed_password": get_password_hash("user123"),
             "role": "user",
             "is_active": True,
+            "status": "approved",
+            "platforms": [],
             "created_at": time.time(),
         }
         await users.insert_one(regular_user)
         logger.info("Created default user (user/user123)")
+
+    # Backfill existing users with new fields (status, platforms)
+    result = await users.update_many(
+        {"status": {"$exists": False}},
+        {"$set": {"status": "approved", "platforms": []}},
+    )
+    if result.modified_count > 0:
+        logger.info(f"Backfilled {result.modified_count} users with status/platforms fields")

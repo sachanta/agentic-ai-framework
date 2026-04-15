@@ -5,7 +5,7 @@ These routes are registered under /api/v1/platforms/hello-world/
 """
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_platform
 from app.platforms.hello_world.schemas import (
     GreetRequest,
     GreetResponse,
@@ -81,7 +81,8 @@ async def list_agents():
     ]
 
 
-@router.post("/execute", response_model=GreetResponse)
+@router.post("/execute", response_model=GreetResponse,
+              dependencies=[Depends(require_platform("hello_world"))])
 async def execute_platform(
     request: GreetRequest,
     current_user: dict = Depends(get_current_user),
@@ -96,7 +97,8 @@ async def execute_platform(
     )
 
 
-@router.post("/agents/greeter/run")
+@router.post("/agents/greeter/run",
+              dependencies=[Depends(require_platform("hello_world"))])
 async def run_greeter_agent(
     request: GreetRequest,
     current_user: dict = Depends(get_current_user),

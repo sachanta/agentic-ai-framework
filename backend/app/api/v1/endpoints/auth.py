@@ -3,12 +3,14 @@ Authentication endpoints.
 """
 import logging
 from datetime import datetime
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 
-from app.core.security import get_current_user
+from app.config import settings
+from app.core.security import get_current_user, require_admin
 from app.services.auth import get_auth_service, AuthService
 
 logger = logging.getLogger(__name__)
@@ -24,6 +26,8 @@ class UserResponse(BaseModel):
     email: str
     role: str
     is_active: bool
+    status: str = "approved"
+    platforms: List[str] = []
 
     class Config:
         from_attributes = True
@@ -45,9 +49,15 @@ class LoginRequest(BaseModel):
 
 class RegisterRequest(BaseModel):
     """Register request schema."""
-    username: str
     email: EmailStr
     password: str
+    platforms: List[str] = []
+
+
+class RegisterResponse(BaseModel):
+    """Register response schema."""
+    message: str
+    status: str
 
 
 class ChangePasswordRequest(BaseModel):
@@ -69,7 +79,29 @@ def _user_to_response(user: dict) -> UserResponse:
         email=user.get("email", ""),
         role=user.get("role", "user"),
         is_active=user.get("is_active", False),
+        status=user.get("status", "approved"),
+        platforms=user.get("platforms", []),
     )
+
+
+async def _check_user_status_on_login_failure(
+    username: str,
+    auth_service: AuthService,
+) -> None:
+    """Check if login failed due to pending/rejected status and raise appropriate error."""
+    existing = await auth_service.get_user_by_username(username)
+    if existing:
+        user_status = existing.get("status", "approved")
+        if user_status == "pending":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account is pending admin approval.",
+            )
+        if user_status == "rejected":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account request was not approved.",
+            )
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -88,6 +120,7 @@ async def login(
     )
 
     if not user:
+        await _check_user_status_on_login_failure(form_data.username, auth_service)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
@@ -120,6 +153,7 @@ async def login_json(
     )
 
     if not user:
+        await _check_user_status_on_login_failure(request.username, auth_service)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
@@ -174,29 +208,142 @@ async def refresh_token(
     )
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     request: RegisterRequest,
     auth_service: AuthService = Depends(get_auth_service),
 ):
     """
-    Register a new user.
+    Register a new user account.
 
-    Creates a new user account with the "user" role.
+    Creates the account in pending status. An approval email
+    is sent to the admin. The user cannot log in until approved.
     """
+    # Validate platform IDs
+    valid_platforms = [
+        p.strip()
+        for p in settings.SIGNUP_AVAILABLE_PLATFORMS.split(",")
+        if p.strip()
+    ]
+    for p in request.platforms:
+        if p not in valid_platforms:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid platform: {p}. Valid platforms: {', '.join(valid_platforms)}",
+            )
+
     try:
         user = await auth_service.create_user(
-            username=request.username,
+            username=request.email,
             email=request.email,
             password=request.password,
             role="user",
+            status="pending",
+            is_active=False,
+            platforms=request.platforms,
         )
-        return _user_to_response(user)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+
+    # Send approval email to admin (non-blocking — don't fail registration if email fails)
+    try:
+        await auth_service.send_approval_email(user)
+    except Exception as e:
+        logger.error(f"Failed to send approval email: {e}")
+
+    return RegisterResponse(
+        message="Account created. Awaiting admin approval.",
+        status="pending",
+    )
+
+
+# --- Email-based one-click approval (public, signed token) ---
+
+
+@router.get("/approve", response_model=MessageResponse)
+async def approve_via_email(
+    token: str,
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """
+    One-click approval from email link.
+
+    Token is a signed JWT containing the user_id and action.
+    """
+    user = await auth_service.approve_user_by_token(token)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired approval link",
+        )
+    return MessageResponse(message=f"User {user.get('email', '')} has been approved.")
+
+
+@router.get("/reject", response_model=MessageResponse)
+async def reject_via_email(
+    token: str,
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """
+    One-click rejection from email link.
+
+    Token is a signed JWT containing the user_id and action.
+    """
+    user = await auth_service.reject_user_by_token(token)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired rejection link",
+        )
+    return MessageResponse(message=f"User {user.get('email', '')} has been rejected.")
+
+
+# --- Admin user management endpoints ---
+
+
+@router.get("/admin/users/pending", response_model=List[UserResponse])
+async def list_pending_users(
+    _current_user: dict = Depends(require_admin),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """List all users awaiting approval. Admin only."""
+    users = await auth_service.list_users_by_status("pending")
+    return [_user_to_response(u) for u in users]
+
+
+@router.post("/admin/users/{user_id}/approve", response_model=MessageResponse)
+async def approve_user(
+    user_id: str,
+    _current_user: dict = Depends(require_admin),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """Approve a pending user account. Admin only."""
+    user = await auth_service.approve_user(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    return MessageResponse(message=f"User {user.get('email', '')} approved")
+
+
+@router.post("/admin/users/{user_id}/reject", response_model=MessageResponse)
+async def reject_user(
+    user_id: str,
+    _current_user: dict = Depends(require_admin),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """Reject a pending user account. Admin only."""
+    user = await auth_service.reject_user(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    return MessageResponse(message=f"User {user.get('email', '')} rejected")
 
 
 @router.post("/change-password", response_model=MessageResponse)

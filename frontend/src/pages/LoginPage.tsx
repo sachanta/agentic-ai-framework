@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Bot } from 'lucide-react';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { useAuthStore } from '@/store/authStore';
@@ -20,6 +20,12 @@ export function LoginPage() {
           <p className="mt-2 text-muted-foreground">Sign in to your account</p>
         </div>
         <LoginForm />
+        <p className="text-center text-sm text-muted-foreground">
+          Don't have an account?{' '}
+          <Link to={ROUTES.SIGNUP} className="text-primary hover:underline font-medium">
+            Create one
+          </Link>
+        </p>
       </div>
     </div>
   );

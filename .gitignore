@@ -12,6 +12,7 @@ eggs/
 .eggs/
 lib/
 lib64/
+!frontend/src/lib/
 parts/
 sdist/
 var/
@@ -25,6 +26,10 @@ wheels/
 venv/
 ENV/
 env/
+evals/.venv-*/
+
+# Runtime output artifacts
+backend/output/
 
 # Environment files
 .env

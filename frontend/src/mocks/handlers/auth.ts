@@ -1,27 +1,30 @@
 import { http, HttpResponse } from 'msw';
 import { mockUsers } from '../data/users';
 
-export const authHandlers = [
-  http.post('*/api/v1/auth/login', async ({ request }) => {
-    const body = await request.json() as { username: string; password: string };
-    const user = mockUsers.find(
-      (u) => u.username === body.username && u.password === body.password
+const loginHandler = async ({ request }: { request: Request }) => {
+  const body = await request.json() as { username: string; password: string };
+  const user = mockUsers.find(
+    (u) => u.username === body.username && u.password === body.password
+  );
+
+  if (!user) {
+    return HttpResponse.json(
+      { message: 'Invalid username or password' },
+      { status: 401 }
     );
+  }
 
-    if (!user) {
-      return HttpResponse.json(
-        { message: 'Invalid username or password' },
-        { status: 401 }
-      );
-    }
+  const { password: _, ...userWithoutPassword } = user;
+  return HttpResponse.json({
+    user: userWithoutPassword,
+    token: `mock-token-${user.id}`,
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  });
+};
 
-    const { password: _, ...userWithoutPassword } = user;
-    return HttpResponse.json({
-      user: userWithoutPassword,
-      token: `mock-token-${user.id}`,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    });
-  }),
+export const authHandlers = [
+  http.post('*/api/v1/auth/login', loginHandler),
+  http.post('*/api/v1/auth/login/json', loginHandler),
 
   http.post('*/api/v1/auth/logout', () => {
     return HttpResponse.json({ message: 'Logged out' });

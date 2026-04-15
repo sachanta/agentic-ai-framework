@@ -7,7 +7,7 @@ Phase 11: Complete REST API with all routers.
 """
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_platform
 from app.platforms.newsletter.schemas import (
     GenerateNewsletterRequest,
     GenerateNewsletterResponse,
@@ -153,7 +153,8 @@ async def list_agents():
 # Legacy endpoints for backward compatibility
 # These are now also available under /newsletters and /workflows prefixes
 
-@router.post("/generate", response_model=GenerateNewsletterResponse)
+@router.post("/generate", response_model=GenerateNewsletterResponse,
+              dependencies=[Depends(require_platform("newsletter"))])
 async def generate_newsletter_legacy(
     request: GenerateNewsletterRequest,
     current_user: dict = Depends(get_current_user),

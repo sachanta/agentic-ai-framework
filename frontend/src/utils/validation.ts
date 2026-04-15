@@ -91,7 +91,18 @@ export const settingsSchema = z.object({
   notifications: notificationSettingsSchema,
 });
 
+export const signupSchema = z.object({
+  email: z.string().email('Valid email required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  confirmPassword: z.string(),
+  platforms: z.array(z.string()).min(1, 'Select at least one platform'),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ['confirmPassword'],
+});
+
 export type LoginFormData = z.infer<typeof loginSchema>;
+export type SignupFormData = z.infer<typeof signupSchema>;
 export type AgentFormData = z.infer<typeof agentSchema>;
 export type ToolFormData = z.infer<typeof toolSchema>;
 export type WorkflowFormData = z.infer<typeof workflowSchema>;

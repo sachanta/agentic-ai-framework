@@ -9,6 +9,7 @@ import { ROUTES } from '@/utils/constants';
 
 // Pages
 import LoginPage from '@/pages/LoginPage';
+import SignupPage from '@/pages/SignupPage';
 import DashboardPage from '@/pages/DashboardPage';
 import AppsPage from '@/pages/AppsPage';
 import AppDetailPage from '@/pages/AppDetailPage';
@@ -60,6 +61,7 @@ function App() {
           <Routes>
             {/* Public routes */}
             <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+            <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
 
             {/* Protected routes */}
             <Route

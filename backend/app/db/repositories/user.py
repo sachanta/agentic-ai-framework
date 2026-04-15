@@ -127,6 +127,8 @@ class UserRepository:
         password: str,
         role: str = "user",
         is_active: bool = True,
+        status: str = "approved",
+        platforms: Optional[List[str]] = None,
     ) -> dict:
         """
         Create a new user.
@@ -137,6 +139,8 @@ class UserRepository:
             password: The plain text password (will be hashed)
             role: The user role (default: "user")
             is_active: Whether the user is active (default: True)
+            status: Approval status (default: "approved")
+            platforms: Platform access list (default: [] = unrestricted)
 
         Returns:
             The created user document
@@ -160,6 +164,8 @@ class UserRepository:
             "hashed_password": get_password_hash(password),
             "role": role,
             "is_active": is_active,
+            "status": status,
+            "platforms": platforms or [],
             "created_at": time.time(),
             "updated_at": None,
         }
@@ -253,6 +259,40 @@ class UserRepository:
             The updated user document or None
         """
         return await self.update(user_id, is_active=is_active)
+
+    async def find_by_status(self, status: str, skip: int = 0, limit: int = 100) -> List[dict]:
+        """
+        Find all users with a given status.
+
+        Args:
+            status: The status to filter by (pending, approved, rejected)
+            skip: Number of documents to skip
+            limit: Maximum number of documents to return
+
+        Returns:
+            List of matching user documents
+        """
+        cursor = self.collection.find({"status": status}).skip(skip).limit(limit)
+        users = []
+        async for doc in cursor:
+            doc["id"] = str(doc.pop("_id"))
+            users.append(doc)
+        return users
+
+    async def set_status(self, user_id: str, status: str) -> Optional[dict]:
+        """
+        Update user approval status.
+
+        Args:
+            user_id: The user's ObjectId as string
+            status: The new status (pending, approved, rejected)
+
+        Returns:
+            The updated user document or None
+        """
+        if status not in ("pending", "approved", "rejected"):
+            raise ValueError(f"Invalid status: {status}")
+        return await self.update(user_id, status=status)
 
     async def change_role(self, user_id: str, role: str) -> Optional[dict]:
         """
