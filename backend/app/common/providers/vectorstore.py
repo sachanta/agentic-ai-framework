@@ -418,7 +418,7 @@ class WeaviateVectorStore(VectorStoreProvider):
         try:
             from weaviate.classes.config import Property, DataType, Configure
 
-            # Build properties
+            # Build properties with explicit index configuration
             weaviate_properties = []
             if properties:
                 type_map = {
@@ -437,11 +437,14 @@ class WeaviateVectorStore(VectorStoreProvider):
                     prop_name = prop.get("name")
                     prop_type = prop.get("dataType", ["text"])[0] if isinstance(prop.get("dataType"), list) else prop.get("dataType", "text")
                     data_type = type_map.get(prop_type.lower(), DataType.TEXT)
+                    is_searchable = data_type == DataType.TEXT
 
                     weaviate_properties.append(Property(
                         name=prop_name,
                         data_type=data_type,
                         description=prop.get("description"),
+                        index_filterable=True,
+                        index_searchable=is_searchable,
                     ))
 
             # Configure vectorizer

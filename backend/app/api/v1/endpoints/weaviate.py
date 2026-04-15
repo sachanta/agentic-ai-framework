@@ -1128,7 +1128,7 @@ RAG_COLLECTION = "RAGDocuments"
 
 
 async def ensure_rag_collection():
-    """Ensure RAG collection exists."""
+    """Ensure RAG collection exists with properly indexed properties."""
     client = check_weaviate()
 
     if not client.collections.exists(RAG_COLLECTION):
@@ -1139,12 +1139,42 @@ async def ensure_rag_collection():
             description="Documents for RAG (Retrieval Augmented Generation)",
             vectorizer_config=Configure.Vectorizer.none(),
             properties=[
-                Property(name="title", data_type=DataType.TEXT),
-                Property(name="content", data_type=DataType.TEXT),
-                Property(name="source", data_type=DataType.TEXT),
-                Property(name="chunk_id", data_type=DataType.TEXT),
-                Property(name="metadata_json", data_type=DataType.TEXT),  # Store metadata as JSON string
-                Property(name="created_at", data_type=DataType.DATE),
+                Property(
+                    name="title",
+                    data_type=DataType.TEXT,
+                    index_filterable=True,
+                    index_searchable=True,
+                ),
+                Property(
+                    name="content",
+                    data_type=DataType.TEXT,
+                    index_filterable=True,
+                    index_searchable=True,
+                ),
+                Property(
+                    name="source",
+                    data_type=DataType.TEXT,
+                    index_filterable=True,
+                    index_searchable=True,
+                ),
+                Property(
+                    name="chunk_id",
+                    data_type=DataType.TEXT,
+                    index_filterable=True,
+                    index_searchable=True,
+                ),
+                Property(
+                    name="metadata_json",
+                    data_type=DataType.TEXT,
+                    index_filterable=False,
+                    index_searchable=False,
+                ),
+                Property(
+                    name="created_at",
+                    data_type=DataType.DATE,
+                    index_filterable=True,
+                    index_searchable=False,
+                ),
             ],
         )
         logger.info(f"Created RAG collection: {RAG_COLLECTION}")
@@ -1356,7 +1386,7 @@ MEMORY_COLLECTION = "AgentMemory"
 
 
 async def ensure_memory_collection():
-    """Ensure agent memory collection exists."""
+    """Ensure agent memory collection exists with properly indexed properties."""
     client = check_weaviate()
 
     if not client.collections.exists(MEMORY_COLLECTION):
@@ -1367,12 +1397,42 @@ async def ensure_memory_collection():
             description="Agent conversation and context memory",
             vectorizer_config=Configure.Vectorizer.none(),
             properties=[
-                Property(name="agent_id", data_type=DataType.TEXT),
-                Property(name="session_id", data_type=DataType.TEXT),
-                Property(name="content", data_type=DataType.TEXT),
-                Property(name="memory_type", data_type=DataType.TEXT),
-                Property(name="metadata_json", data_type=DataType.TEXT),  # Store metadata as JSON string
-                Property(name="created_at", data_type=DataType.DATE),
+                Property(
+                    name="agent_id",
+                    data_type=DataType.TEXT,
+                    index_filterable=True,
+                    index_searchable=True,
+                ),
+                Property(
+                    name="session_id",
+                    data_type=DataType.TEXT,
+                    index_filterable=True,
+                    index_searchable=True,
+                ),
+                Property(
+                    name="content",
+                    data_type=DataType.TEXT,
+                    index_filterable=True,
+                    index_searchable=True,
+                ),
+                Property(
+                    name="memory_type",
+                    data_type=DataType.TEXT,
+                    index_filterable=True,
+                    index_searchable=True,
+                ),
+                Property(
+                    name="metadata_json",
+                    data_type=DataType.TEXT,
+                    index_filterable=False,
+                    index_searchable=False,
+                ),
+                Property(
+                    name="created_at",
+                    data_type=DataType.DATE,
+                    index_filterable=True,
+                    index_searchable=False,
+                ),
             ],
         )
         logger.info(f"Created memory collection: {MEMORY_COLLECTION}")
