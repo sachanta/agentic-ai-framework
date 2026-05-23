@@ -1,0 +1,6 @@
+[submodule "moonshot-data"]
+	path = moonshot-data
+	url = https://github.com/aiverify-foundation/moonshot-data.git
+[submodule "moonshot-ui"]
+	path = moonshot-ui
+	url = https://github.com/aiverify-foundation/moonshot-ui.git
