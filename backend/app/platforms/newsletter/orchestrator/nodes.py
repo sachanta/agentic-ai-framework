@@ -327,15 +327,19 @@ async def store_newsletter_node(state: NewsletterState) -> dict[str, Any]:
     Persists the newsletter to databases.
     """
     from app.platforms.newsletter.repositories import NewsletterRepository
-    from app.platforms.newsletter.models.newsletter import Newsletter, NewsletterStatus
 
     logger.info("Storing newsletter")
 
     try:
-        # Create newsletter document
-        newsletter = Newsletter(
+        title = state.get("selected_subject") or _extract_subject_text(state.get("subject_lines", []), "Newsletter")
+
+        repo = NewsletterRepository()
+        result = await repo.create(
             user_id=state["user_id"],
-            title=state.get("selected_subject") or _extract_subject_text(state.get("subject_lines", []), "Newsletter"),
+            title=title,
+            topics=state.get("topics", []),
+            tone=state.get("tone", "professional"),
+            workflow_id=state["workflow_id"],
             content=state.get("newsletter_content", ""),
             html_content=state.get("newsletter_html", ""),
             plain_text=state.get("newsletter_plain", ""),
@@ -344,16 +348,10 @@ async def store_newsletter_node(state: NewsletterState) -> dict[str, Any]:
                 s.get("text", str(s)) if isinstance(s, dict) else str(s)
                 for s in state.get("subject_lines", [])
             ],
-            status=NewsletterStatus.READY,
-            workflow_id=state["workflow_id"],
-            topics_covered=state.get("topics", []),
-            tone_used=state.get("tone", "professional"),
             word_count=state.get("word_count", 0),
             research_data={"articles": state.get("articles", [])},
         )
-
-        repo = NewsletterRepository()
-        newsletter_id = await repo.create(newsletter)
+        newsletter_id = result.get("id") or result.get("_id")
 
         # TODO: Store in RAG (Phase 4 integration)
         stored_in_rag = False
@@ -454,8 +452,10 @@ def checkpoint_articles_node(state: NewsletterState) -> dict[str, Any]:
             "checkpoints_completed": state.get("checkpoints_completed", []) + ["research_review"],
         }
 
-    # Approved
+    # Approved — use selected articles if provided, otherwise keep all
+    approved_articles = response.get("articles", articles)
     return {
+        "articles": approved_articles,
         "current_checkpoint": None,
         "checkpoint_response": response,
         "checkpoints_completed": state.get("checkpoints_completed", []) + ["research_review"],
